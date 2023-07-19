@@ -1,5 +1,7 @@
 ---
 # tasks file for roles/ocp-sos
+
+# Task install pre-requisites installs the required Python packages openshift, pyyaml, and kubernetes using the pip module.
 - name: install pre-requisites
   pip:
     name:
@@ -7,22 +9,26 @@
       - pyyaml
       - kubernetes
 
+# Task Get MachineConfigPools retrieves information about the MachineConfigPools from the OpenShift cluster using the k8s_info module and stores the result in the variable machineconfigpools.
 - name: Get MachineConfigPools
   k8s_info:
     api_version: machineconfiguration.openshift.io/v1
     kind: MachineConfigPool
   register: machineconfigpools
 
+# Task Extract Node Count per MachineConfigPool iterates over the machineconfigpools.resources list, extracting the metadata.name and status.machineCount values for each MachineConfigPool and stores them in the nodes_per_mcp dictionary.
 - name: Extract Node Count per MachineConfigPool
   set_fact:
     nodes_per_mcp: "{{ nodes_per_mcp | default({}) | combine({item.metadata.name: item.status.machineCount}) }}"
   loop: "{{ machineconfigpools.resources }}"
 
+# Task Determine OCP Cluster Type sets the ocp_cluster fact based on the number of master and worker nodes. If the number of master nodes is 1 and the number of worker nodes is 0, the ocp_cluster is set to 'SNO'. Otherwise, if there is at least one master node, it is set to 'MNO'.
 - name: Determine OCP Cluster Type
   set_fact:
     ocp_cluster: "{{ 'SNO' if nodes_per_mcp.master == 1 and nodes_per_mcp.worker == 0 else 'MNO' }}"
   when: nodes_per_mcp.master >= 1
-
+  
+# Task Debug Tasks Enabled prints the values of nodes_per_mcp and ocp_cluster if the variable use_debug_tasks is set to True.
 - name: Debug Tasks Enabled
   block:
     - debug:
@@ -31,21 +37,25 @@
           var: ocp_cluster
   when: use_debug_tasks
 
+# Task Set Fact List for OCP Cluster sets the node_types fact based on the ocp_cluster value. If the cluster is Single Node OpenShift (SNO), node_types is set to ['master'], otherwise, for Multi Node OpenShift (MNO), it is set to ['master', 'worker'].
 - name: Set Fact List for OCP Cluster
   set_fact:
     node_types: "{{ ['master'] if ocp_cluster == 'SNO' else ['master', 'worker'] }}"
-
+    
+# Task Encode the toolboxrc_content content in base64 encodes the toolboxrc_content variable (assumed to be defined elsewhere) in base64 and stores the result in the encoded_variable fact.
 - name: Encode the toolboxrc_content content in base64
   set_fact:
     encoded_variable: "{{ toolboxrc_content | b64encode }}"
-
+    
+# Task template the sosreport for each MachineConfigPool uses the template module to generate individual MachineConfig files for each node type (master and worker) based on templates located in the files directory. The templates are named enable-sos-report-master.yaml and enable-sos-report-worker.yaml.
 - name: template the sosreport for each MachineConfigPool
   template:
     src: "{{role_path}}/files/enable-sos-report-{{ item }}.yaml"
     dest:  "{{role_path}}/templates/enable-sos-report.yaml.j2"
     mode: '0644'
   loop: "{{ node_types }}"
-
+  
+# Task Apply the MachineConfigPool uses the k8s module to apply the generated MachineConfig for each node type (master and worker) in the OpenShift cluster.
 - name: Apply the MachineConfigPool
   k8s:
     api_version: machineconfiguration.openshift.io/v1
