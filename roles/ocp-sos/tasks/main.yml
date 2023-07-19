@@ -46,8 +46,8 @@
 # Task Encode the toolboxrc_content content in base64 encodes the toolboxrc_content variable (assumed to be defined elsewhere) in base64 and stores the result in the encoded_variable fact.
 - name: Encode the toolboxrc_content content in base64
   set_fact:
-    encoded_variable: "{{ toolboxrc_content | b64encode }}"
-    
+    toolboxrc_base64_content: "{{ toolboxrc_content | b64encode }}"
+
 # Task template the sosreport for each MachineConfigPool uses the template module to generate individual MachineConfig files for each node type (master and worker) based on templates located in the files directory. The templates are named enable-sos-report-master.yaml and enable-sos-report-worker.yaml.
 - name: template the sosreport for each MachineConfigPool
   template:
