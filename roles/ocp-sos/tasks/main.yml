@@ -23,10 +23,11 @@
   loop: "{{ machineconfigpools.resources }}"
 
 # Task Determine OCP Cluster Type sets the ocp_cluster fact based on the number of master and worker nodes. If the number of master nodes is 1 and the number of worker nodes is 0, the ocp_cluster is set to 'SNO'. Otherwise, if there is at least one master node, it is set to 'MNO'.
+# In the context of a SNO+1 (Single Node OpenShift + 1 Worker) scenario, the playbook is extending the condition to behave like an MNO (Multi-Node OpenShift). As a result, it applies the manifests for both the MachineConfigPool groups.
 - name: Determine OCP Cluster Type
   set_fact:
     ocp_cluster: "{{ 'SNO' if nodes_per_mcp.master == 1 and nodes_per_mcp.worker == 0 else 'MNO' }}"
-  when: nodes_per_mcp.master >= 1
+  when: ((nodes_per_mcp.master <= 3 or nodes_per_mcp.master == 1) and nodes_per_mcp.worker == 0)
   
 # Task Debug Tasks Enabled prints the values of nodes_per_mcp and ocp_cluster if the variable use_debug_tasks is set to True.
 - name: Debug Tasks Enabled

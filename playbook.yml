@@ -1,9 +1,11 @@
 ---
 - name: Enable sosreport Ansible-Playbook
   hosts: localhost
-  gather_facts: no
+  gather_facts: false
   environment:
-    KUBECONFIG: /apps/kcli-plan/kubeconfig
+    # Make sure to set 'path_to_kubeconfig' to the correct path where your kubeconfig file resides.
+    KUBECONFIG: "{{path_to_kubeconfig}}/kubeconfig"
+  # Define the required collections to be used in this playbook.
   collections:
     - community.kubernetes
     - kubernetes.core

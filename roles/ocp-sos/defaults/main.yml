@@ -1,6 +1,7 @@
 ---
 # defaults file for roles/ocp-sos
-use_debug_tasks: true  # Change this to 'false' to skip debug tasks
+use_debug_tasks: true                                                                       # Change this to 'false' to skip debug tasks
+path_to_kubeconfig: /apps/kcli-plan/                                                        # Change this to your environment path to kubeconfig file for accessing k8s cluster
 toolboxrc_content: |
     REGISTRY=${OFFLINE_REG}:${OFFLINE_REG_PORT}
     IMAGE=${OFFLINE_REG}:${OFFLINE_REG_PORT}/${OFFLINE_REG_NAMESPACE}/rhel8/support-tools
