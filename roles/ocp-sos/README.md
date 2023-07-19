@@ -1,7 +1,7 @@
-Role Name
+ocp-sos
 =========
 
-A brief description of the role goes here.
+This role helps configure the OpenShift cluster to enable the sosreport functionality, which collects system information and logs for troubleshooting purposes. The role considers different cluster configurations and applies the appropriate MachineConfigPool manifests based on the number of master and worker nodes present in the cluster. Additionally, it includes debug tasks for testing and provides flexibility to use base64-encoded variables and templates to achieve the desired configuration.
 
 Requirements
 ------------
@@ -30,7 +30,7 @@ Including an example of how to use your role (for instance, with variables passe
 License
 -------
 
-BSD
+MIT License.
 
 Author Information
 ------------------

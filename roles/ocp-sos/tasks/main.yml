@@ -54,6 +54,7 @@
     src: "{{role_path}}/files/enable-sos-report-{{ item }}.yaml"
     dest:  "{{role_path}}/templates/enable-sos-report.yaml.j2"
     mode: '0644'
+    backup: yes
   loop: "{{ node_types }}"
   
 # Task Apply the MachineConfigPool uses the k8s module to apply the generated MachineConfig for each node type (master and worker) in the OpenShift cluster.
