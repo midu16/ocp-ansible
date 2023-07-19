@@ -1,0 +1,26 @@
+{% for item in node_types %}
+apiVersion: machineconfiguration.openshift.io/v1
+kind: MachineConfig
+metadata:
+  labels:
+    machineconfiguration.openshift.io/role: {{ item }}
+  name: 99-{{ item }}-toolboxrc-configuration
+spec:
+  config:
+    ignition:
+      config: {}
+      security:
+        tls: {}
+      timeouts: {}
+      version: 3.1.0
+    networkd: {}
+    passwd: {}
+    storage:
+      files:
+      - contents:
+          source: {{ toolboxrc_base64_content }}
+        mode: 420
+        overwrite: true
+        path: /root/.toolboxrc
+  osImageURL: ''
+{% endfor %}

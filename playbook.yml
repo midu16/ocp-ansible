@@ -1,0 +1,15 @@
+---
+- name: Enable sosreport Ansible-Playbook
+  hosts: localhost
+  gather_facts: no
+  environment:
+    KUBECONFIG: /apps/kcli-plan/kubeconfig
+  collections:
+    - community.kubernetes
+    - kubernetes.core
+  vars_files:
+    - roles/ocp-sos/defaults/main.yml
+
+  roles:
+    - ocp-sos
+

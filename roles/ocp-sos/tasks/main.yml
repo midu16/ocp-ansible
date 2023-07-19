@@ -1,0 +1,56 @@
+---
+# tasks file for roles/ocp-sos
+
+    - name: install pre-requisites
+      pip:
+        name:
+          - openshift
+          - pyyaml
+          - kubernetes
+
+    - name: Get MachineConfigPools
+      k8s_info:
+        api_version: machineconfiguration.openshift.io/v1
+        kind: MachineConfigPool
+      register: machineconfigpools
+
+    - name: Extract Node Count per MachineConfigPool
+      set_fact:
+        nodes_per_mcp: "{{ nodes_per_mcp | default({}) | combine({item.metadata.name: item.status.machineCount}) }}"
+      loop: "{{ machineconfigpools.resources }}"
+
+    - name: Determine OCP Cluster Type
+      set_fact:
+        ocp_cluster: "{{ 'SNO' if nodes_per_mcp.master == 1 and nodes_per_mcp.worker == 0 else 'MNO' }}"
+      when: nodes_per_mcp.master >= 1
+
+    - name: Debug Tasks Enabled
+      block:
+        - debug:
+            var: nodes_per_mcp
+        - debug:
+              var: ocp_cluster
+      when: use_debug_tasks
+
+    - name: Set Fact List for OCP Cluster
+      set_fact:
+        node_types: "{{ ['master'] if ocp_cluster == 'SNO' else ['master', 'worker'] }}"
+
+    - name: Encode the toolboxrc_content content in base64
+      set_fact:
+        encoded_variable: "{{ toolboxrc_content | b64encode }}"
+  
+    - name: template the sosreport for each MachineConfigPool
+      template:
+        src: "{{role_path}}/files/enable-sos-report-{{ item }}.yaml"
+        dest:  "{{role_path}}/templates/enable-sos-report.yaml.j2"
+        mode: '0644'
+      loop: "{{ node_types }}"
+    
+    - name: Apply the MachineConfigPool
+      k8s:
+        api_version: machineconfiguration.openshift.io/v1
+        kind: MachineConfig
+        state: present
+        definition: "{{ lookup('file', '{{role_path}}/files/enable-sos-report-master.yaml') }}"
+      loop: "{{ node_types }}"
