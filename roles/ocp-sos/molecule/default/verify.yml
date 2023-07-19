@@ -1,9 +1,26 @@
 ---
 # This is an example playbook to execute Ansible tests.
 
-- name: Verify
+- name: Verify facts after applying the ocp-sos role
   hosts: all
+  gather_facts: false
+
   tasks:
-  - name: Example assertion
-    assert:
-      that: true
+    - name: Check if ocp_cluster is defined and valid
+      assert:
+        that:
+          - "ocp_cluster is defined"
+          - "ocp_cluster == 'SNO' or ocp_cluster == 'MNO'"
+
+    - name: Check if node_types is defined and valid
+      assert:
+        that:
+          - "node_types is defined"
+          - "node_types == ['master'] or node_types == ['master', 'worker']"
+
+    - name: Check if toolboxrc_base64_content is defined and valid
+      assert:
+        that:
+          - "toolboxrc_base64_content is defined"
+          - "toolboxrc_base64_content is string"
+
