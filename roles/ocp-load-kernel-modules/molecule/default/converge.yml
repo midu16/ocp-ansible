@@ -1,0 +1,7 @@
+---
+- name: Converge
+  hosts: all
+  tasks:
+    - name: "Include roles/ocp-load-kernel-modules"
+      include_role:
+        name: "roles/ocp-load-kernel-modules"

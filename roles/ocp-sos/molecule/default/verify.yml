@@ -18,9 +18,20 @@
           - "node_types is defined"
           - "node_types == ['master'] or node_types == ['master', 'worker']"
 
-    - name: Check if toolboxrc_base64_content is defined and valid
+    - name: Check if toolboxrc_base64_content is defined , valid and not empty
       assert:
         that:
           - "toolboxrc_base64_content is defined"
           - "toolboxrc_base64_content is string"
+          - "toolboxrc_base64_content | length > 0"
 
+    - name: Decode toolboxrc_base64_content
+      set_fact:
+        decoded_variable: "{{ toolboxrc_base64_content | b64decode }}"
+      when: toolboxrc_base64_content is defined
+
+    - name: Check if decoded_variable is defined and not empty
+      assert:
+        that:
+          - "decoded_variable is defined"
+          - "decoded_variable | length > 0"
