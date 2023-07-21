@@ -30,13 +30,14 @@
   when: ((nodes_per_mcp.master <= 3 or nodes_per_mcp.master == 1) and nodes_per_mcp.worker == 0)
   
 # Task Debug Tasks Enabled prints the values of nodes_per_mcp and ocp_cluster if the variable use_debug_tasks is set to True.
-- name: Debug Tasks Enabled
-  block:
-    - debug:
-        var: nodes_per_mcp
-    - debug:
-          var: ocp_cluster
-  when: use_debug_tasks
+- name: Debug Node Count per MachineConfigPool
+  debug:
+    var: nodes_per_mcp
+    verbosity: 2
+- name: Debug OCP Cluster Type 
+  debug:
+    var: ocp_cluster
+    verbosity: 2
 
 # Task Set Fact List for OCP Cluster sets the node_types fact based on the ocp_cluster value. If the cluster is Single Node OpenShift (SNO), node_types is set to ['master'], otherwise, for Multi Node OpenShift (MNO), it is set to ['master', 'worker'].
 - name: Set Fact List for OCP Cluster
