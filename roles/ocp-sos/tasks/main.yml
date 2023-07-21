@@ -48,20 +48,34 @@
   set_fact:
     toolboxrc_base64_content: "{{ toolboxrc_content | b64encode }}"
 
-# Task template the sosreport for each MachineConfigPool uses the template module to generate individual MachineConfig files for each node type (master and worker) based on templates located in the files directory. The templates are named enable-sos-report-master.yaml and enable-sos-report-worker.yaml.
-- name: template the sosreport for each MachineConfigPool
-  template:
-    src: "{{role_path}}/files/enable-sos-report-{{ item }}.yaml"
-    dest:  "{{role_path}}/templates/enable-sos-report.yaml.j2"
-    mode: '0644'
-    backup: yes
-  loop: "{{ node_types }}"
-  
 # Task Apply the MachineConfigPool uses the k8s module to apply the generated MachineConfig for each node type (master and worker) in the OpenShift cluster.
-- name: Apply the MachineConfigPool
+- name: Create MachineConfig
   k8s:
-    api_version: machineconfiguration.openshift.io/v1
     kind: MachineConfig
     state: present
-    definition: "{{ lookup('file', '{{role_path}}/files/enable-sos-report-master.yaml') }}"
-  loop: "{{ node_types }}"
+    definition: |
+      apiVersion: machineconfiguration.openshift.io/v1
+      kind: MachineConfig
+      metadata:
+        labels:
+          machineconfiguration.openshift.io/role: {{ item }}
+        name: 99-{{ item }}-toolboxrc-configuration
+      spec:
+        config:
+          ignition:
+            config: {}
+            security:
+              tls: {}
+            timeouts: {}
+            version: 3.1.0
+          networkd: {}
+          passwd: {}
+          storage:
+            files:
+            - contents:
+                source: {{ toolboxrc_base64_content }}
+              mode: 420
+              overwrite: true
+              path: /root/.toolboxrc
+        osImageURL: ''
+    loop: "{{ node_types }}"
