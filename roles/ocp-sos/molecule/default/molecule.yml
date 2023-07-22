@@ -5,9 +5,17 @@ driver:
   name: docker
 platforms:
   - name: instance
-    image: docker.io/pycontribs/centos:7
+    image: docker.io/pycontribs/centos:7  # Replace with your preferred base image
     pre_build_image: true
 provisioner:
   name: ansible
+  inventory:
+    group_vars:
+      all:
+        # Define your variables here if required for testing
+
 verifier:
   name: ansible
+
+scenario:
+  name: default

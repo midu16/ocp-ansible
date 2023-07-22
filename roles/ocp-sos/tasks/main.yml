@@ -79,4 +79,6 @@
               overwrite: true
               path: /root/.toolboxrc
         osImageURL: ''
+    validate:
+      fail_on_error: yes
     loop: "{{ node_types }}"
