@@ -1,0 +1,7 @@
+---
+- name: Converge
+  hosts: all
+  tasks:
+    - name: "Include roles/ocp-mirror"
+      include_role:
+        name: "roles/ocp-mirror"

@@ -1,0 +1,111 @@
+---
+# tasks file for roles/ocp-mirror
+- name: Determine OS and Architecture
+  set_fact:
+    os_distribution: "{{ ansible_facts['os_family'] | lower }}"
+    os_architecture: "{{ ansible_architecture }}"
+    ocp_version: "{{ocp_release_version}}"
+    download_url_path: "https://mirror.openshift.com/pub/openshift-v4/"
+
+- name: Set Download URL for x86_64 architecture for oc-client
+  block:
+    - name: Set the Download URL for Redhat distribution
+      set_fact:
+        oc_cli_download_url: "{{download_url_path}}/{{os_architecture}}/clients/ocp/{{ocp_version}}/openshift-client-linux-{{ocp_version}}.tar.gz"
+      when: os_distribution == "redhat" # Replace with your desired Linux distribution
+    - name: Set the Download URL for macOS distribution
+      set_fact:
+        oc_cli_download_url: "{{download_url_path}}/{{os_architecture}}/clients/ocp/{{ocp_version}}/openshift-client-mac-{{ocp_version}}.tar.gz"
+      when: os_distribution == "darwin" # macOS distribution
+
+    # All the binaries will be kept in the same directory on the ${HOME} of the OS
+    - name: Create the ${HOME}/.oc-mirror-directory
+      file:
+        path: "${{ ansible_env.HOME }}/.oc-mirror"
+        state: directory
+        mode: "0775"
+    - name: Download oc binary
+      get_url:
+        url: "{{ oc_cli_download_url }}"
+        dest: "${{ ansible_env.HOME }}/.oc-mirror/oc.tar.gz"
+        mode: "0755"
+      delegate_to: localhost
+    - name: Extract oc.tar.gz
+      unarchive:
+        src: "{{ ansible_env.HOME }}/.oc-mirror/oc.tar.gz"
+        dest: "{{ ansible_env.HOME }}/.oc-mirror/"
+        remote_src: yes
+      delegate_to: localhost
+  when: os_architecture == "x86_64"
+
+- name: Set Download URL for arm64 architecture for oc-client
+  block:
+    - name: Set the Download URL for Redhat distribution
+      set_fact:
+        oc_cli_download_url: "{{download_url_path}}/{{os_architecture}}/clients/ocp/{{ocp_version}}/openshift-client-linux-arm64-{{ocp_version}}.tar.gz"
+      when: os_distribution == "redhat" # Replace with your desired Linux distribution
+    - name: Set the Download URL for macOS distribution
+      set_fact:
+        oc_cli_download_url: "{{download_url_path}}/{{os_architecture}}/clients/ocp/{{ocp_version}}/openshift-client-mac-arm64-{{ocp_version}}.tar.gz"
+      when: os_distribution == "darwin" # macOS distribution
+
+    # All the binaries will be kept in the same directory on the ${HOME} of the OS
+    - name: Create the ${HOME}/.oc-mirror-directory
+      file:
+        path: "${{ ansible_env.HOME }}/.oc-mirror"
+        state: directory
+        mode: "0775"
+    - name: Download oc binary
+      get_url:
+        url: "{{ oc_cli_download_url }}"
+        dest: "${{ ansible_env.HOME }}/.oc-mirror/oc.tar.gz"
+        mode: "0755"
+      delegate_to: localhost
+    - name: Extract oc.tar.gz
+      unarchive:
+        src: "{{ ansible_env.HOME }}/.oc-mirror/oc.tar.gz"
+        dest: "{{ ansible_env.HOME }}/.oc-mirror/"
+        remote_src: yes
+      delegate_to: localhost
+  when: os_architecture == "arm64"
+
+- name: Set Download URL for Redhat distribution for oc-mirror-client
+  block:
+    - name: Set the Download URL for x86_64 architecture
+      set_fact:
+        oc_mirror_cli_download_url: "{{download_url_path}}/{{os_architecture}}/clients/ocp/{{ocp_version}}/oc-mirror.tar.gz"
+      when: os_architecture == "x86_64" # Replace with your desired arhchitecture
+    - name: Set the Download URL for arm64 architecture
+      set_fact:
+        oc_mirror_cli_download_url: "{{download_url_path}}/{{os_architecture}}/clients/ocp/{{ocp_version}}/oc-mirror.tar.gz"
+      when: os_architecture == "arm64" # Replace with your desired arhchitecture
+    - name: Download oc-mirror binary
+      get_url:
+        url: "{{ oc_mirror_cli_download_url }}"
+        dest: "${{ ansible_env.HOME }}/.oc-mirror/oc-mirror.tar.gz"
+        mode: "0755"
+      delegate_to: localhost
+    - name: Extract oc-mirror.tar.gz
+      unarchive:
+        src: "{{ ansible_env.HOME }}/.oc-mirror/oc-mirror.tar.gz"
+        dest: "{{ ansible_env.HOME }}/.oc-mirror/"
+        remote_src: yes
+      delegate_to: localhost
+  when: os_distribution == "redhat" or os_distribution == "fedora" 
+
+# Template the imageset-config.yaml file for the ocp release, template the pull-secret from RH and for the OfflineRegistry
+
+# Template the imageset-config.yaml file of each new ocp-release and notify the Mirror ocp release to create the tar.gz bundle
+- name: Template imageset-config.yaml
+  template:
+    src: "imageset-config.yaml.j2"
+    dest: "{{ ansible_env.HOME }}/.oc-mirror/imageset-config.yaml"
+  notify:  Mirror ocp release 
+
+# Create the ocp-release.tar.gz file and validate that the size its always maintained to the same level
+
+
+# Make sure ocp-release.tar.gz content its ConnePush the ocp-release.tar.gz file to the specific Offline Registry
+# curl -X GET -u pi:raspberry https://inbacrnrdl0100.offline.oxtechnix.lan:5000/v2/_catalog | jq .
+
+
