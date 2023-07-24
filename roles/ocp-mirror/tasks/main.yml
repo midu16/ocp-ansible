@@ -6,10 +6,12 @@
     os_architecture: "{{ ansible_architecture }}"
     ocp_version: "{{ocp_release_version}}"
     download_url_path: "https://mirror.openshift.com/pub/openshift-v4/"
+    registry_url: "https://{{registry_fqdn}}:{{registry_port}}/v2/_catalog"
+
 
 - name: Set Download URL for x86_64 architecture for oc-client
   block:
-    - name: Set the Download URL for Redhat distribution
+    - name: Set the Download URL for Redhat distributio
       set_fact:
         oc_cli_download_url: "{{download_url_path}}/{{os_architecture}}/clients/ocp/{{ocp_version}}/openshift-client-linux-{{ocp_version}}.tar.gz"
       when: os_distribution == "redhat" # Replace with your desired Linux distribution
@@ -19,23 +21,11 @@
       when: os_distribution == "darwin" # macOS distribution
 
     # All the binaries will be kept in the same directory on the ${HOME} of the OS
-    - name: Create the ${HOME}/.oc-mirror-directory
+    - name: Create the {{ ansible_env.HOME }}/.oc-mirror-directory
       file:
-        path: "${{ ansible_env.HOME }}/.oc-mirror"
+        path: "{{ ansible_env.HOME }}/.oc-mirror"
         state: directory
         mode: "0775"
-    - name: Download oc binary
-      get_url:
-        url: "{{ oc_cli_download_url }}"
-        dest: "${{ ansible_env.HOME }}/.oc-mirror/oc.tar.gz"
-        mode: "0755"
-      delegate_to: localhost
-    - name: Extract oc.tar.gz
-      unarchive:
-        src: "{{ ansible_env.HOME }}/.oc-mirror/oc.tar.gz"
-        dest: "{{ ansible_env.HOME }}/.oc-mirror/"
-        remote_src: yes
-      delegate_to: localhost
   when: os_architecture == "x86_64"
 
 - name: Set Download URL for arm64 architecture for oc-client
@@ -50,23 +40,11 @@
       when: os_distribution == "darwin" # macOS distribution
 
     # All the binaries will be kept in the same directory on the ${HOME} of the OS
-    - name: Create the ${HOME}/.oc-mirror-directory
+    - name: Create the {{ ansible_env.HOME }}/.oc-mirror-directory
       file:
-        path: "${{ ansible_env.HOME }}/.oc-mirror"
+        path: "{{ ansible_env.HOME }}/.oc-mirror"
         state: directory
         mode: "0775"
-    - name: Download oc binary
-      get_url:
-        url: "{{ oc_cli_download_url }}"
-        dest: "${{ ansible_env.HOME }}/.oc-mirror/oc.tar.gz"
-        mode: "0755"
-      delegate_to: localhost
-    - name: Extract oc.tar.gz
-      unarchive:
-        src: "{{ ansible_env.HOME }}/.oc-mirror/oc.tar.gz"
-        dest: "{{ ansible_env.HOME }}/.oc-mirror/"
-        remote_src: yes
-      delegate_to: localhost
   when: os_architecture == "arm64"
 
 - name: Set Download URL for Redhat distribution for oc-mirror-client
@@ -79,20 +57,25 @@
       set_fact:
         oc_mirror_cli_download_url: "{{download_url_path}}/{{os_architecture}}/clients/ocp/{{ocp_version}}/oc-mirror.tar.gz"
       when: os_architecture == "arm64" # Replace with your desired arhchitecture
-    - name: Download oc-mirror binary
-      get_url:
-        url: "{{ oc_mirror_cli_download_url }}"
-        dest: "${{ ansible_env.HOME }}/.oc-mirror/oc-mirror.tar.gz"
-        mode: "0755"
-      delegate_to: localhost
-    - name: Extract oc-mirror.tar.gz
-      unarchive:
-        src: "{{ ansible_env.HOME }}/.oc-mirror/oc-mirror.tar.gz"
-        dest: "{{ ansible_env.HOME }}/.oc-mirror/"
-        remote_src: yes
-      delegate_to: localhost
   when: os_distribution == "redhat" or os_distribution == "fedora" 
 
+- name: Render Containerfile.j2 template
+  template:
+    src: Containerfile.j2
+    dest: "{{ ansible_env.HOME }}/.oc-mirror-directory/Containerfile"
+  delegate_to: localhost
+
+- name: Build the container image
+  docker_image:
+    name: "oc_kubeadm_mirror"
+    path: "{{ ansible_env.HOME }}/.oc-mirror-directory/Containerfile"
+    state: present
+
+- name: Create a directory on the target host for mounting
+  file:
+    path: "{{ ansible_env.HOME }}/.oc-mirror-directory/"
+    state: directory
+    mode: '0755'
 # Template the imageset-config.yaml file for the ocp release, template the pull-secret from RH and for the OfflineRegistry
 
 # Template the imageset-config.yaml file of each new ocp-release and notify the Mirror ocp release to create the tar.gz bundle
@@ -102,10 +85,38 @@
     dest: "{{ ansible_env.HOME }}/.oc-mirror/imageset-config.yaml"
   notify:  Mirror ocp release 
 
+- name: Run the Docker container with volume mounted
+  docker_container:
+    name: my_container
+    image: my_custom_image
+    state: started
+    volumes:
+      - "/path/on/host:/path/on/container"
+    ports:
+      - "80:80"
 # Create the ocp-release.tar.gz file and validate that the size its always maintained to the same level
 
 
-# Make sure ocp-release.tar.gz content its ConnePush the ocp-release.tar.gz file to the specific Offline Registry
+# Validate the connectivity to the Offline Registry can be established and if not, dont push the .tar.gz
 # curl -X GET -u pi:raspberry https://inbacrnrdl0100.offline.oxtechnix.lan:5000/v2/_catalog | jq .
-
+- name: Perform curl request with authentication
+  uri:
+    url: "{{ registry_url }}"                           # registry_fqdn and registry_port are defined in the defaults/main.yaml and can be changed during playbook definition
+    method: GET
+    user: "{{ registry_username }}"                     # Secrets should be managed in the vault
+    password: "{{ registry_password }}"                 # Secrets should be managed in the vault
+    status_code: 200                                    # Expected status code for a successful response
+    validate_certs: no                                  # Set to 'yes' if you want to validate SSL certificates
+  register: response
+- name: Extract response content
+  set_fact:
+    response_content: "{{ response.content | from_json }}"
+- name: Validate connectivity to the registry
+  assert:
+    that:
+      - response.status == 200
+      - response_content is defined
+      - response_content|length > 0
+  fail_msg: "Failed to establish connectivity to the offline registry."
+  success_msg: "Successfully connected to the offline registry."
 

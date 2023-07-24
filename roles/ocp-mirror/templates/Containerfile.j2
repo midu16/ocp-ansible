@@ -1,0 +1,54 @@
+# Use a base image with the desired Linux distribution (e.g., CentOS, Ubuntu)
+FROM docker.io/library/centos:7
+
+# Set the maintainer 
+MAINTAINER midu@redhat.com
+
+# Set the working directory
+# This directory will be used for managing the binaries and prepare the mirroring .tar.gz
+WORKDIR /app
+
+# Creating the admin user
+RUN useradd -ms /bin/bash admin
+# Adding the admin user to 'sudo' group
+RUN usermod -a -G root admin
+
+# Set environment variables for OpenShift client version and download URLs
+ENV OC_VERSION="{{ocp_version}}"
+ENV OC_MIRROR_VERSION="{{ocp_version}}"
+# openshift-client-linux.tar.gz contains oc and kubeadm binaries
+ENV OC_DOWNLOAD_URL="{{ oc_cli_download_url }}"
+# oc-mirror 
+ENV OC_MIRROR_DOWNLOAD_URL="{{ oc_mirror_cli_download_url }}"
+
+# Install necessary tools (wget, tar)
+RUN yum update -y && \
+    yum install -y wget tar
+
+# Download oc, kubeadm, and oc-mirror binaries
+RUN wget -O /app/oc.tar.gz ${OC_DOWNLOAD_URL} && \
+    tar -C /app -zxvf /app/oc.tar.gz && \
+    mv /app/oc /usr/local/bin/oc && \
+    mv /app/kubectl /usr/local/bin/kubectl && \
+    chmod +x /usr/local/bin/kubectl && \
+    wget -O /app/oc-mirror ${OC_MIRROR_DOWNLOAD_URL} && \
+    tar -C /app -zxvf /app/oc-mirror.tar.gz && \
+    mv /app/oc-mirror /usr/local/bin/oc-mirror && \
+    chmod +x /usr/local/bin/oc-mirror
+
+# Add /app to the PATH environment variable
+ENV PATH="/usr/local/bin:${PATH}"
+
+# Cleanup unnecessary files
+RUN rm -rf /app/*
+
+# Switching to admin user
+USER admin
+# Switching to admin $HOME
+WORKDIR /home/admin
+
+# Creating the mountpoint of .docker for config.json
+VOLUME /home/admin/.docker
+
+# Set the entrypoint of the container to /bin/bash
+CMD ["/bin/bash"]

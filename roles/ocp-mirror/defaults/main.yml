@@ -1,2 +1,4 @@
 ---
 # defaults file for roles/ocp-mirror
+registry_fqdn: "inbacrnrdl0100.offline.oxtechnix.lan"
+registry_port: "5000"
