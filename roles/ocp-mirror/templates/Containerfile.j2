@@ -1,5 +1,5 @@
 # Use a base image with the desired Linux distribution (e.g., CentOS, Ubuntu)
-FROM docker.io/library/centos:7
+FROM docker.io/rockylinux/rockylinux:8
 
 # Set the maintainer 
 MAINTAINER midu@redhat.com
@@ -48,7 +48,10 @@ USER admin
 WORKDIR /home/admin
 
 # Creating the mountpoint of .docker for config.json
-VOLUME /home/admin/.docker
+VOLUME [ "/home/admin/.docker" ]
+
+# Creating the mountpoint of /app for exposing the .tar.gz
+VOLUME [ "/app" ]
 
 # Set the entrypoint of the container to /bin/bash
 CMD ["/bin/bash"]

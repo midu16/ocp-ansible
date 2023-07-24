@@ -73,7 +73,7 @@
 
 - name: Create a directory on the target host for mounting
   file:
-    path: "{{ ansible_env.HOME }}/.oc-mirror-directory/"
+    path: "{{ ansible_env.HOME }}/.oc-mirror-directory/app"
     state: directory
     mode: '0755'
 # Template the imageset-config.yaml file for the ocp release, template the pull-secret from RH and for the OfflineRegistry
@@ -85,13 +85,15 @@
     dest: "{{ ansible_env.HOME }}/.oc-mirror/imageset-config.yaml"
   notify:  Mirror ocp release 
 
+# podman run -d --rm -it --name oc_mirror --net="host" --ipc=host -v /app:/app:z oc_kubeadm_mirror:latest
 - name: Run the Docker container with volume mounted
   docker_container:
-    name: my_container
-    image: my_custom_image
+    name: oc_mirror
+    image: localhost/oc_kubeadm_mirror:latest
     state: started
     volumes:
-      - "/path/on/host:/path/on/container"
+      - "/app:/app:z"
+      - ""
     ports:
       - "80:80"
 # Create the ocp-release.tar.gz file and validate that the size its always maintained to the same level
