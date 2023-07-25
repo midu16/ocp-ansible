@@ -1,0 +1,15 @@
+---
+namespace_name: "openshift-sriov-network-operator"
+operator_name: "sriov-network-operator"
+subscription_name: "{{ operator_name }}-subscription"
+subscription_channel: "4.12"
+subscription_source: "redhat-operators"
+subscription_source_namespace: "openshift-marketplace"
+instance_name: "default"
+sriov_network_node_policy_name: "sriov-nic-1"
+device_type: "netdevice"
+link_type: "eth"
+pf_names: "ens1f1"
+num_vfs: 8
+priority: 99
+resource_name: "sriov_nic_1"

@@ -1,0 +1,144 @@
+---
+- name: Create Logging Namespace
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: "{{ namespace_name }}"
+    definition:
+      metadata:
+        annotations:
+          openshift.io/node-selector: ""
+          workload.openshift.io/allowed: management
+        labels:
+          openshift.io/cluster-monitoring: "true"
+    state: present
+
+- name: Create Logging OperatorGroup
+  kubernetes.core.k8s:
+    api_version: operators.coreos.com/v1
+    kind: OperatorGroup
+    name: cluster-logging
+    namespace: "{{ namespace_name }}"
+    definition:
+      spec:
+        targetNamespaces:
+          - "{{ namespace_name }}"
+    state: present
+
+- name: Create Logging Subscription
+  kubernetes.core.k8s:
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    name: cluster-logging
+    namespace: "{{ namespace_name }}"
+    definition:
+      spec:
+        channel: "{{ subscription_channel }}"
+        name: cluster-logging
+        source: "{{ subscription_source }}"
+        sourceNamespace: "{{ subscription_source_namespace }}"
+    state: present
+
+- name: Wait until Logging Operator installation is Succeeded
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    namespace: "{{ namespace_name }}"
+    label_selectors:
+      - "operators.coreos.com/cluster-logging.openshift-logging"
+  register: logging_status
+  until:
+    - logging_status.resources | length > 0
+    - logging_status.resources[0].status.phase == 'Succeeded'
+  retries: "{{ retries_var | default(90) }}"
+  delay: "{{ delay_var | default(10) }}"     # default timeout ==> retries x delay = 900sec
+
+- name: Print Logging Status
+  ansible.builtin.debug:
+    var: logging_status.resources
+    verbosity: 2
+
+- name: "[{{ ocp_cluster }}] Create ClusterLogging"
+  kubernetes.core.k8s:
+    definition: |
+      apiVersion: logging.openshift.io/v1
+      kind: ClusterLogging
+      metadata:
+        name: "{{ instance_name }}"
+        namespace: "{{ namespace_name }}"
+      spec:
+        collection:
+      {% if ocp_cluster == 'MNO' %}
+          logs:
+            fluentd:
+              resources:
+                limits:
+                  memory: 736Mi
+                requests:
+                  cpu: 100m
+                  memory: 736Mi
+            type: fluentd
+        logStore:
+          elasticsearch:
+            nodeCount: 3
+            proxy:
+              resources:
+                limits:
+                  memory: 256Mi
+                requests:
+                  cpu: 100m
+                  memory: 256Mi
+            redundancyPolicy: SingleRedundancy
+            resources:
+              limits:
+                memory: 16Gi
+              requests:
+                cpu: 1
+                memory: 16Gi
+            storage:
+              size: 100G
+              storageClassName: "{{ storageclass_name }}"
+          retentionPolicy:
+            audit:
+              maxAge: 7d
+            infra:
+              maxAge: 7d
+          type: elasticsearch
+        managementState: Managed
+        visualization:
+          kibana:
+            replicas: 1
+            resources:
+              limits:
+                memory: 736Mi
+              requests:
+                cpu: 100m
+                memory: 736Mi
+          type: kibana
+      {% else %}
+          fluentd: {}
+          type: fluentd
+        curation:
+          curator:
+            schedule: "30 3 * * *"
+          type: curator
+        managementState: Managed
+      {% endif %}
+        
+- name: "[MNO] Create ClusterLogForwarder"
+  kubernetes.core.k8s:
+    api_version: logging.openshift.io/v1
+    kind: ClusterLogForwarder
+    name: "{{ instance_name }}"
+    namespace: "{{ namespace_name }}"
+    definition:
+      spec:
+        pipelines:
+        - inputRefs:
+          - infrastructure
+          - application
+          - audit
+          name: all-to-default
+          outputRefs:
+          - default
+  when: ocp_cluster == "MNO"
