@@ -1,7 +1,7 @@
 Role Name
 =========
 
-A role that its gathering and setting facts about OCP 
+A brief description of the role goes here.
 
 Requirements
 ------------

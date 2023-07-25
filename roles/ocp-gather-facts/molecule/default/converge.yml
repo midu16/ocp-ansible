@@ -1,0 +1,7 @@
+---
+- name: Converge
+  hosts: all
+  tasks:
+    - name: "Include roles/ocp-gather-facts"
+      include_role:
+        name: "roles/ocp-gather-facts"

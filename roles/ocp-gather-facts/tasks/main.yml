@@ -1,0 +1,45 @@
+---
+# tasks file for roles/ocp-gather-facts
+
+# Task install pre-requisites installs the required Python packages openshift, pyyaml, and kubernetes using the pip module.
+- name: install pre-requisites
+  pip:
+    name:
+      - openshift
+      - pyyaml
+      - kubernetes
+
+# Task Get MachineConfigPools retrieves information about the MachineConfigPools from the OpenShift cluster using the k8s_info module and stores the result in the variable machineconfigpools.
+- name: Get MachineConfigPools
+  k8s_info:
+    api_version: machineconfiguration.openshift.io/v1
+    kind: MachineConfigPool
+  register: machineconfigpools
+
+# Task Extract Node Count per MachineConfigPool iterates over the machineconfigpools.resources list, extracting the metadata.name and status.machineCount values for each MachineConfigPool and stores them in the nodes_per_mcp dictionary.
+- name: Extract Node Count per MachineConfigPool
+  set_fact:
+    nodes_per_mcp: "{{ nodes_per_mcp | default({}) | combine({item.metadata.name: item.status.machineCount}) }}"
+  loop: "{{ machineconfigpools.resources }}"
+
+# Task Determine OCP Cluster Type sets the ocp_cluster fact based on the number of master and worker nodes. If the number of master nodes is 1 and the number of worker nodes is 0, the ocp_cluster is set to 'SNO'. Otherwise, if there is at least one master node, it is set to 'MNO'.
+# In the context of a SNO+1 (Single Node OpenShift + 1 Worker) scenario, the playbook is extending the condition to behave like an MNO (Multi-Node OpenShift). As a result, it applies the manifests for both the MachineConfigPool groups.
+- name: Determine OCP Cluster Type
+  set_fact:
+    ocp_cluster: "{{ 'SNO' if nodes_per_mcp.master == 1 and nodes_per_mcp.worker == 0 else 'MNO' }}"
+  when: ((nodes_per_mcp.master <= 3 or nodes_per_mcp.master == 1) and nodes_per_mcp.worker == 0)
+  
+# Task Debug Tasks Enabled prints the values of nodes_per_mcp and ocp_cluster if the variable use_debug_tasks is set to True.
+- name: Debug Node Count per MachineConfigPool
+  debug:
+    var: nodes_per_mcp
+    verbosity: 2
+- name: Debug OCP Cluster Type 
+  debug:
+    var: ocp_cluster
+    verbosity: 2
+
+# Task Set Fact List for OCP Cluster sets the node_types fact based on the ocp_cluster value. If the cluster is Single Node OpenShift (SNO), node_types is set to ['master'], otherwise, for Multi Node OpenShift (MNO), it is set to ['master', 'worker'].
+- name: Set Fact List for OCP Cluster
+  set_fact:
+    node_types: "{{ ['master'] if ocp_cluster == 'SNO' else ['master', 'worker'] }}"
