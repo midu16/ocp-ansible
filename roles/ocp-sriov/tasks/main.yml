@@ -1,0 +1,86 @@
+---
+- name: Create SR-IOV Namespace
+  kubernetes.core.k8s:
+    api_version: v1
+    kind: Namespace
+    name: "{{ namespace_name }}"
+    definition:
+      metadata:
+        annotations:
+          workload.openshift.io/allowed: management
+    state: present
+
+- name: Create SR-IOV OperatorGroup
+  kubernetes.core.k8s:
+    api_version: operators.coreos.com/v1
+    kind: OperatorGroup
+    name: "{{ operator_name }}s"
+    namespace: "{{ namespace_name }}"
+    definition:
+      spec:
+        targetNamespaces:
+          - "{{ namespace_name }}"
+    state: present
+
+- name: Create SR-IOV Subscription
+  kubernetes.core.k8s:
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+    name: "{{ subscription_name }}"
+    namespace: "{{ namespace_name }}"
+    definition:
+      spec:
+        channel: "{{ subscription_channel }}"
+        name: "{{ operator_name }}"
+        source: "{{ subscription_source }}"
+        sourceNamespace: "{{ subscription_source_namespace }}"
+    state: present
+
+- name: Wait until SR-IOV Operator installation is Succeeded
+  kubernetes.core.k8s_info:
+    api_version: operators.coreos.com/v1alpha1
+    kind: ClusterServiceVersion
+    namespace: "{{ namespace_name }}"
+    label_selectors:
+      - "operators.coreos.com/{{ operator_name }}.{{ namespace_name }}"
+  register: sriov_status
+  until:
+    - sriov_status.resources | length > 0
+    - sriov_status.resources[0].status.phase == 'Succeeded'
+  retries: "{{ retries_var | default(90) }}"
+  delay: "{{ delay_var | default(10) }}"     # default timeout ==> retries x delay = 900sec
+
+- name: Print SR-IOV operator Status
+  ansible.builtin.debug:
+    var: sriov_status.resources
+    verbosity: 2
+
+- name: "Create Sriov Operator Configuration"
+  kubernetes.core.k8s:
+    api_version: sriovnetwork.openshift.io/v1
+    kind: SriovOperatorConfig
+    name: "{{ instance_name }}"
+    namespace: "{{ namespace_name }}"
+    definition:
+      spec:
+        disableDrain: true
+    state: present
+
+- name: "Create Sriov Network Node Policy"
+  kubernetes.core.k8s:
+    api_version: sriovnetwork.openshift.io/v1
+    kind: SriovNetworkNodePolicy
+    name: "{{ sriov_network_node_policy_name }}"
+    namespace: "{{ namespace_name }}"
+    definition:
+      spec:
+        deviceType: "{{ device_type }}"
+        linkType: "{{ link_type }}"
+        nicSelector:
+          pfNames: "[\"{{ pf_names }}\"]"
+        nodeSelector:
+          node-role.kubernetes.io/master: ""
+        numVfs: "{{ num_vfs }}"
+        priority: "{{ priority }}"
+        resourceName: "{{ resource_name }}"
+    state: present

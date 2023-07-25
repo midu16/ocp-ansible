@@ -1,0 +1,7 @@
+---
+namespace_name: openshift-logging
+subscription_channel: "stable-5.6"
+subscription_source: redhat-operators
+subscription_source_namespace: openshift-marketplace
+instance_name: instance
+storageclass_name: ocs-storagecluster-ceph-rbd
