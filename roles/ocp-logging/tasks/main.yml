@@ -1,6 +1,6 @@
 ---
 - name: Create Logging Namespace
-  kubernetes.core.k8s:
+  k8s:
     api_version: v1
     kind: Namespace
     name: "{{ namespace_name }}"
@@ -14,7 +14,7 @@
     state: present
 
 - name: Create Logging OperatorGroup
-  kubernetes.core.k8s:
+  k8s:
     api_version: operators.coreos.com/v1
     kind: OperatorGroup
     name: cluster-logging
@@ -26,7 +26,7 @@
     state: present
 
 - name: Create Logging Subscription
-  kubernetes.core.k8s:
+  k8s:
     api_version: operators.coreos.com/v1alpha1
     kind: Subscription
     name: cluster-logging
@@ -40,7 +40,7 @@
     state: present
 
 - name: Wait until Logging Operator installation is Succeeded
-  kubernetes.core.k8s_info:
+  k8s_info:
     api_version: operators.coreos.com/v1alpha1
     kind: ClusterServiceVersion
     namespace: "{{ namespace_name }}"
@@ -54,12 +54,12 @@
   delay: "{{ delay_var | default(10) }}"     # default timeout ==> retries x delay = 900sec
 
 - name: Print Logging Status
-  ansible.builtin.debug:
+  debug:
     var: logging_status.resources
     verbosity: 2
 
 - name: "[{{ ocp_cluster }}] Create ClusterLogging"
-  kubernetes.core.k8s:
+  k8s:
     definition: |
       apiVersion: logging.openshift.io/v1
       kind: ClusterLogging
@@ -126,7 +126,7 @@
       {% endif %}
         
 - name: "[MNO] Create ClusterLogForwarder"
-  kubernetes.core.k8s:
+  k8s:
     api_version: logging.openshift.io/v1
     kind: ClusterLogForwarder
     name: "{{ instance_name }}"

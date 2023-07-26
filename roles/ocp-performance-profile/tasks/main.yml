@@ -1,6 +1,6 @@
 ---
 - name: Create Master PerformanceProfile Resource
-  kubernetes.core.k8s:
+  k8s:
     api_version: performance.openshift.io/v2
     kind: PerformanceProfile
     name: "{{ performance_profile_name }}"
@@ -30,7 +30,7 @@
     state: present
 
 - name: Create Worker PerformanceProfile Resource
-  kubernetes.core.k8s:
+  k8s:
     api_version: performance.openshift.io/v2
     kind: PerformanceProfile
     name: "{{ performance_profile_name }}-worker"

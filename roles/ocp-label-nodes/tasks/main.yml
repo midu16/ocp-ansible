@@ -1,0 +1,42 @@
+---
+- block:
+  - name: Get Nodes Info
+    k8s_info:
+      api_version: v1
+      kind: Node
+    register: nodes_info
+
+  - name: Print Nodes Info
+    debug:
+      var: item.metadata.labels
+      verbosity: 2
+    loop: "{{ nodes_info.resources | list }}"
+
+  - name: Label Nodes
+    k8s:
+      api_version: v1
+      kind: Node
+      name: "{{ item.metadata.name }}"
+      resource_definition:
+        apiVersion: v1
+        kind: Node
+        metadata:
+          name: "{{ item.metadata.name }}"
+          labels:
+            app: "{{ 'vCU' if 'node-role.kubernetes.io/master' in (item.metadata.labels | default({})) else 'vDU' }}"
+    loop: "{{ nodes_info.resources | list }}"
+    no_log: true
+
+  - name: Get Nodes Info
+    k8s_info:
+      api_version: v1
+      kind: Node
+    register: nodes_info_labeled
+
+  - name: Print Nodes Info
+    debug:
+      var: item.metadata.labels
+      verbosity: 2
+    loop: "{{ nodes_info_labeled.resources | list }}"
+
+  when: ocp_cluster == "SNO+1"

@@ -1,6 +1,6 @@
 ---
 - name: Change MachineConfigPool {{ machineconfigpool_name }} state
-  kubernetes.core.k8s:
+  k8s:
     definition:
       apiVersion: machineconfiguration.openshift.io/v1
       kind: MachineConfigPool
@@ -12,14 +12,14 @@
 
 - block:
   - name: Get MachineConfigPool status
-    kubernetes.core.k8s_info:
+    k8s_info:
       api_version: machineconfiguration.openshift.io/v1
       kind: MachineConfigPool
       name: "{{ machineconfigpool_name }}"
     register: mcp_info
 
   - name: Print MachineConfigPool status
-    ansible.builtin.debug:
+    debug:
       msg:
       - "- RENDER DEGRADED: {{ mcp_info.resources[0].status.conditions[0].status }}"
       - "- NODE DEGRADED: {{ mcp_info.resources[0].status.conditions[1].status }}"
@@ -29,7 +29,7 @@
       verbosity: 2
 
   - name: Wait until MachineConfigPool progressed
-    kubernetes.core.k8s_info:
+    k8s_info:
       api_version: machineconfiguration.openshift.io/v1
       kind: MachineConfigPool
       name: "{{ machineconfigpool_name }}"
@@ -45,7 +45,7 @@
     delay: "{{ delay_var | default(10) }}"      # default timeout ==> retries x delay = 900sec
 
   - name: Print MachineConfigPool status
-    ansible.builtin.debug:
+    debug:
       msg:
       - "- RENDER DEGRADED: {{ mcp_status.resources[0].status.conditions[0].status }}"
       - "- NODE DEGRADED: {{ mcp_status.resources[0].status.conditions[1].status }}"
