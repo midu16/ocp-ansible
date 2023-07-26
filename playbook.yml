@@ -1,7 +1,7 @@
 ---
 - name: Example playbook
   hosts: localhost
-  gather_facts: no
+  gather_facts: false
   environment:
   # Make sure to set 'path_to_kubeconfig' to the correct path where your kubeconfig file resides.
     KUBECONFIG: kubeconfig
