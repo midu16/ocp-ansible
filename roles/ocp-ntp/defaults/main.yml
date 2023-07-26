@@ -1,0 +1,3 @@
+---
+# defaults file for roles/ocp-ntp
+chronyd_service_status: 'false'

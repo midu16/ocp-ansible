@@ -1,0 +1,7 @@
+---
+- name: Converge
+  hosts: all
+  tasks:
+    - name: "Include roles/ocp-ntp"
+      include_role:
+        name: "roles/ocp-ntp"
