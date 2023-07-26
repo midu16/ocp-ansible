@@ -44,8 +44,14 @@
   set_fact:
     node_types: "{{ ['master'] if ocp_cluster == 'SNO' else ['master', 'worker'] }}"
 
+# Task Retrieve information about the Kubernetes nodes in the cluster
 - name: Get Nodes information
   k8s_info:
     api_version: machineconfiguration.openshift.io/v1
     kind: Node
   register: nodes_info
+
+# Task extracts the names of Kubernetes nodes from the previously collected nodes_info variable and stores them in a new variable called node_names.
+- name: Extract node names
+  set_fact:
+    node_names: "{{ nodes_info.resources | map(attribute='metadata.name') | list }}"
