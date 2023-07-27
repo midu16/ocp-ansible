@@ -106,4 +106,10 @@
   register: pods_info
   with_items: "{{ cluster_operator_namespaces }}"
 
+- name: Check Cluster information
+  k8s_info:
+    api_version: "config.openshift.io/v1"
+    kind: ClusterVersion
+  register: cluster_info
+
 
