@@ -4,13 +4,11 @@
   gather_facts: false
   environment:
   # Make sure to set 'path_to_kubeconfig' to the correct path where your kubeconfig file resides.
-    KUBECONFIG: kubeconfig
+    KUBECONFIG: "{{path_to_kubeconfig}}/kubeconfig"
   # Define the required collections to be used in this playbook.
   collections:
     - community.kubernetes
     - kubernetes.core
-  vars:
-    ocp_cluster: SNO
   roles:
     - role: ocp-label-nodes
     - role: ocp-mcp-pause

@@ -51,7 +51,59 @@
     kind: Node
   register: nodes_info
 
+# Task Retrieve information about the Kubernetes pods in the cluster on all namespaces
+- name: Get Kubernetes pods in all namespaces
+  k8s_info:
+    api_version: v1
+    kind: Pod
+    namespace: all
+  register: pods_info
+
+# Task Retrieve information about the Kubernetes services in the cluster
+- name: Get Kubernetes services in all namespaces
+  k8s_info:
+    api_version: v1
+    kind: Service
+    namespace: all
+  register: services_info
+
 # Task extracts the names of Kubernetes nodes from the previously collected nodes_info variable and stores them in a new variable called node_names.
 - name: Extract node names
   set_fact:
     node_names: "{{ nodes_info.resources | map(attribute='metadata.name') | list }}"
+
+- name: Extract namespaces on the OCP
+  k8s_info:
+    api_version: v1
+    kind: "Namespace"
+  register: namespaces_info
+
+- name: Get ClusterOperators
+  k8s_info:
+    api_version: "config.openshift.io/v1"
+    kind: "ClusterOperator"
+  register: cluster_operator_info
+
+- name: Extract ClusterOperator Names to a List Variable
+  set_fact:
+    cluster_operator_names: "{{ cluster_operator_names | default([]) + [item.metadata.name] }}"
+  with_items: "{{ cluster_operator_info.resources }}"
+
+- name: Create Fact Dictionary with Namespace for each ClusterOperator
+  set_fact:
+    cluster_operator_namespaces: "{{ cluster_operator_namespaces | default([]) | union([item.namespace]) }}"
+  loop: "{{ cluster_operator_info.resources | map(attribute='status.relatedObjects') | flatten }}"
+  when: item.namespace is defined and item.resource != 'templates' and item.resource != 'imagestreams'
+
+#- name: Display Fact Dictionary with Namespace
+#  debug:
+#    var: cluster_operator_namespaces
+
+- name: Get Pods in the Specific Namespace
+  k8s_info:
+    kind: Pod
+    namespace: "{{ item }}"
+  register: pods_info
+  with_items: "{{ cluster_operator_namespaces }}"
+
+
