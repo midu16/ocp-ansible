@@ -35,7 +35,7 @@
       name: "{{ machineconfigpool_name }}"
     register: mcp_status
     until:
-      - mcp_status.resources | length > 0
+      - mcp_status.resources | default([]) | length > 0
       - mcp_status.resources[0].status.conditions[0].status == 'False'  # Render Degraded
       - mcp_status.resources[0].status.conditions[1].status == 'False'  # Node Degraded
       - mcp_status.resources[0].status.conditions[2].status == 'False'  # Degraded
@@ -53,4 +53,5 @@
       - "- UPDATED: {{ mcp_status.resources[0].status.conditions[3].status }}"
       - "- UPDATING: {{ mcp_status.resources[0].status.conditions[4].status }}"
       verbosity: 2
+
   when: machineconfigpool_paused | lower == 'false' # when unpausing
