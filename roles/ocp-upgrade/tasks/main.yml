@@ -1,0 +1,106 @@
+---
+- name: Set ack_data variable based on upgrade_channel
+  set_fact:
+    ack_data: >-
+      {{
+        'ack-4.12-kube-1.26-api-removals-in-4.13'
+        if '4.12' in upgrade_channel
+        else
+        'ack-4.13-kube-1.27-api-removals-in-4.14'
+        if '4.13' in upgrade_channel      
+      }}
+
+- name: Print ack_data variable
+  debug:
+    msg: "ack_data: {{ ack_data }}"
+    verbosity: 2
+
+- name: Check Cluster Information
+  k8s_info:
+    api_version: config.openshift.io/v1
+    kind: ClusterVersion
+  register: cluster_info
+
+- name: Print Upgradeable Cluster Information
+  debug:
+    msg: "- {{ item.type }}: {{ item.status }}"
+    verbosity: 2
+  loop: "{{ cluster_info.resources[0].status.conditions }}"
+
+- name: Patch admin-acks ConfigMap for 4.12
+  k8s:
+    api_version: v1
+    kind: ConfigMap
+    name: admin-acks
+    namespace: openshift-config
+    definition: |
+      data:
+        {{ ack_data }}: "true"
+    merge_type: merge
+    state: present
+
+- name: Set OpenShift Upgrade Channel
+  k8s:
+    api_version: config.openshift.io/v1
+    kind: ClusterVersion
+    name: version
+    namespace: openshift-config
+    definition:
+      spec:
+        channel: "{{ upgrade_channel }}"
+        clusterID: "{{ cluster_info.resources[0].spec.clusterID }}"
+    state: present
+
+- name: Trigger OpenShift Upgrade
+  k8s:
+    api_version: config.openshift.io/v1
+    kind: ClusterVersion
+    name: version
+    namespace: openshift-config
+    definition:
+      spec:
+        desiredUpdate:
+          version: "{{ desired_update }}"
+    state: present
+  register: perform_upgrade
+
+- block:
+  - name: Wait until Upgrade starts
+    k8s_info:
+      api_version: config.openshift.io/v1
+      kind: ClusterVersion
+    register: cluster_info_post
+    until: cluster_info_post.resources[0].status.conditions[5].status == 'True' # Progressing
+    retries: "{{ upgrade_retries | default(60) }}"
+    delay: "{{ upgrade_delay | default(5) }}"       # default timeout ==> retries x delay = 300sec (5min)
+    failed_when: False
+
+  - name: Print Upgradeable Cluster Information
+    debug:
+      msg: "- {{ item.type }}: {{ item.status }}"
+      verbosity: 2      
+    loop: "{{ cluster_info_post.resources[0].status.conditions }}"
+
+  - name: Wait until Upgrade progressed
+    k8s_info:
+      api_version: config.openshift.io/v1
+      kind: ClusterVersion
+    register: upgrade_status
+    until:
+      - upgrade_status.resources | default([]) | length > 0
+      - upgrade_status.resources[0].status.conditions[0].status == 'True'   # Retrieved Updates
+      - upgrade_status.resources[0].status.conditions[1].status == 'False'  # Implicitly Enabled Capabilities
+      - upgrade_status.resources[0].status.conditions[2].status == 'True'   # Release Accepted
+      - upgrade_status.resources[0].status.conditions[3].status == 'True'   # Available
+      - upgrade_status.resources[0].status.conditions[4].status == 'False'  # Failing
+      - upgrade_status.resources[0].status.conditions[5].status == 'False'  # Progressing
+    retries: "{{ retries_var | default(600) }}"
+    delay: "{{ delay_var | default(10) }}"      # default timeout ==> retries x delay = 6000sec (1h 40min)
+
+  - name: Print Upgradeable Cluster Information
+    debug:
+      msg: "- {{ item.type }}: {{ item.status }}"
+      verbosity: 2      
+    loop: "{{ upgrade_status.resources[0].status.conditions }}"
+
+  when: perform_upgrade.changed
