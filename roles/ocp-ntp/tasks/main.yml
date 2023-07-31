@@ -44,5 +44,5 @@
               name: chronyd.service
     validate:
       fail_on_error: yes
-    when: item == "master"
+    when: "{{ item }}" == "master"
     loop: "{{ node_types }}"
