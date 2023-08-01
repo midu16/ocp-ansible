@@ -1,0 +1,55 @@
+---
+- name: "[{{ item }}] Change MachineConfigPool state"
+  k8s:
+    definition: |
+      apiVersion: machineconfiguration.openshift.io/v1
+      kind: MachineConfigPool
+      metadata:
+        name: "{{ item }}"
+      spec:
+        paused: {{ machineconfigpool_paused | bool }}
+        maxUnavailable: "{{ 200 if (item == "worker" and not machineconfigpool_reset | default(false) | bool) else 1 }}"
+    state: present
+  register: mcp_state
+
+- block:
+  - name: "[{{ item }}] Wait until MachineConfigPool Updating status is True"
+    k8s_info:
+      api_version: machineconfiguration.openshift.io/v1
+      kind: MachineConfigPool
+      name: "{{ item }}"
+    register: mcp_info
+    until: mcp_info.resources[0].status.conditions | selectattr('type', 'eq', 'Updating') | map(attribute='status') | first | bool
+    retries: "{{ mcp_updating_retries | default(60) }}"
+    delay: "{{ mcp_updating_delay | default(5) }}"       # default timeout ==> retries x delay = 300sec (5min)
+    failed_when: False
+
+  - name: "[{{ item }}] Print MachineConfigPool status"
+    debug:
+      var: mcp_info.resources[0].status.conditions
+      verbosity: 2
+
+  - name: "[{{ item }}] Wait until MachineConfigPool progressed"
+    k8s_info:
+      api_version: machineconfiguration.openshift.io/v1
+      kind: MachineConfigPool
+      name: "{{ item }}"
+    register: mcp_status
+    until:
+      - mcp_status.resources | default([]) | length > 0
+      - not mcp_status.resources[0].status.conditions | selectattr('type', 'eq', 'RenderDegraded') | map(attribute='status') | first | bool # False
+      - not mcp_status.resources[0].status.conditions | selectattr('type', 'eq', 'NodeDegraded') | map(attribute='status') | first | bool   # False
+      - not mcp_status.resources[0].status.conditions | selectattr('type', 'eq', 'Degraded') | map(attribute='status') | first | bool       # False
+      - mcp_status.resources[0].status.conditions | selectattr('type', 'eq', 'Updated') | map(attribute='status') | first | bool            # True
+      - not mcp_status.resources[0].status.conditions | selectattr('type', 'eq', 'Updating') | map(attribute='status') | first | bool       # False
+    retries: "{{ retries_var | default(90) }}"
+    delay: "{{ delay_var | default(10) }}"      # default timeout ==> retries x delay = 900sec
+
+  - name: "[{{ item }}] Print MachineConfigPool status"
+    debug:
+      var: mcp_status.resources[0].status.conditions
+      verbosity: 2
+
+  when:
+    - not machineconfigpool_paused | bool # when unpausing
+    - mcp_state.changed # when machineconfigpool paused state changed

@@ -70,7 +70,7 @@
       api_version: config.openshift.io/v1
       kind: ClusterVersion
     register: cluster_info_post
-    until: cluster_info_post.resources[0].status.conditions[5].status == 'True' # Progressing
+    until: cluster_info_post.resources[0].status.conditions | selectattr('type', 'eq', 'Progressing') | map(attribute='status') | first | bool
     retries: "{{ upgrade_retries | default(60) }}"
     delay: "{{ upgrade_delay | default(5) }}"       # default timeout ==> retries x delay = 300sec (5min)
     failed_when: False
@@ -78,7 +78,7 @@
   - name: Print Upgradeable Cluster Information
     debug:
       msg: "- {{ item.type }}: {{ item.status }}"
-      verbosity: 2      
+      verbosity: 2
     loop: "{{ cluster_info_post.resources[0].status.conditions }}"
 
   - name: Wait until Upgrade progressed
@@ -88,19 +88,19 @@
     register: upgrade_status
     until:
       - upgrade_status.resources | default([]) | length > 0
-      - upgrade_status.resources[0].status.conditions[0].status == 'True'   # Retrieved Updates
-      - upgrade_status.resources[0].status.conditions[1].status == 'False'  # Implicitly Enabled Capabilities
-      - upgrade_status.resources[0].status.conditions[2].status == 'True'   # Release Accepted
-      - upgrade_status.resources[0].status.conditions[3].status == 'True'   # Available
-      - upgrade_status.resources[0].status.conditions[4].status == 'False'  # Failing
-      - upgrade_status.resources[0].status.conditions[5].status == 'False'  # Progressing
+      - upgrade_status.resources[0].status.conditions | selectattr('type', 'eq', 'RetrievedUpdates') | map(attribute='status') | first | bool
+      - not upgrade_status.resources[0].status.conditions | selectattr('type', 'eq', 'ImplicitlyEnabledCapabilities') | map(attribute='status') | first | bool
+      - upgrade_status.resources[0].status.conditions | selectattr('type', 'eq', 'ReleaseAccepted') | map(attribute='status') | first | bool
+      - upgrade_status.resources[0].status.conditions | selectattr('type', 'eq', 'Available') | map(attribute='status') | first | bool
+      - not upgrade_status.resources[0].status.conditions | selectattr('type', 'eq', 'Failing') | map(attribute='status') | first | bool
+      - not upgrade_status.resources[0].status.conditions | selectattr('type', 'eq', 'Progressing') | map(attribute='status') | first | bool
     retries: "{{ retries_var | default(600) }}"
     delay: "{{ delay_var | default(10) }}"      # default timeout ==> retries x delay = 6000sec (1h 40min)
 
   - name: Print Upgradeable Cluster Information
     debug:
       msg: "- {{ item.type }}: {{ item.status }}"
-      verbosity: 2      
+      verbosity: 2
     loop: "{{ upgrade_status.resources[0].status.conditions }}"
 
   when: perform_upgrade.changed
