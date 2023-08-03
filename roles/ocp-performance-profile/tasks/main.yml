@@ -1,61 +1,31 @@
 ---
-- name: Create Master PerformanceProfile Resource
+- name: "Create PerformanceProfile Resource"
   k8s:
-    api_version: performance.openshift.io/v2
-    kind: PerformanceProfile
-    name: "{{ performance_profile_name }}"
-    definition:
+    definition: |
+      apiVersion: performance.openshift.io/v2
+      kind: PerformanceProfile
       metadata:
         annotations:
-          ran.openshift.io/reference-configuration: ran-du.redhat.com
+          kubeletconfig.experimental: {{ kubeletconfig_annotation | to_json }}
+        name: {{ item }}-profile
       spec:
-        additionalKernelArgs: "{{ additional_kernel_args }}"
+        additionalKernelArgs: {{ additional_kernel_args }}
         cpu:
-          isolated: "{{ cpu_isolated }}"
-          reserved: "{{ cpu_reserved }}"
-        globallyDisableIrqLoadBalancing: "{{ globally_disable_irq_load_balancing }}"
+          isolated: {{ cpu_config[ocp_cluster][item]['isolated'] }}
+          reserved: {{ cpu_config[ocp_cluster][item]['reserved'] }}
+        globallyDisableIrqLoadBalancing: {{ globally_disable_irq_load_balancing }}
         hugepages:
-          defaultHugepagesSize: "{{ default_hugepages_size }}"
+          defaultHugepagesSize: {{ default_hugepages_size }}
           pages:
-            - count: "{{ pages_count }}"
-              size: "{{ pages_size }}"
+            - count: {{ pages_count[ocp_cluster] }}
+              size: {{ pages_size }}
         machineConfigPoolSelector:
-          pools.operator.machineconfiguration.openshift.io/master: ''
+          pools.operator.machineconfiguration.openshift.io/{{ item }}: ''
         nodeSelector:
-          node-role.kubernetes.io/master: ''
+          node-role.kubernetes.io/{{ item }}: ''
         numa:
-          topologyPolicy: "{{ numa_topology_policy }}"
+          topologyPolicy: {{ numa_topology_policy }}
         realTimeKernel:
-          enabled: "{{ real_time_kernel_enabled }}"
+          enabled: {{ real_time_kernel_enabled }}
     state: present
-
-- name: Create Worker PerformanceProfile Resource
-  k8s:
-    api_version: performance.openshift.io/v2
-    kind: PerformanceProfile
-    name: "{{ performance_profile_name }}-worker"
-    definition:
-      metadata:
-        annotations:
-          ran.openshift.io/reference-configuration: ran-du.redhat.com
-      spec:
-        additionalKernelArgs: "{{ additional_kernel_args }}"
-        cpu:
-          isolated: "{{ cpu_isolated }}"
-          reserved: "{{ cpu_reserved }}"
-        globallyDisableIrqLoadBalancing: "{{ globally_disable_irq_load_balancing }}"
-        hugepages:
-          defaultHugepagesSize: "{{ default_hugepages_size }}"
-          pages:
-            - count: "{{ pages_count }}"
-              size: "{{ pages_size }}"
-        machineConfigPoolSelector:
-          pools.operator.machineconfiguration.openshift.io/worker: ''
-        nodeSelector:
-          node-role.kubernetes.io/worker: ''
-        numa:
-          topologyPolicy: "{{ numa_topology_policy }}"
-        realTimeKernel:
-          enabled: "{{ real_time_kernel_enabled }}"
-    state: present
-  when: ocp_cluster == "MNO"
+  loop: "{{ node_types }}"

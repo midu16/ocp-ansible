@@ -1,14 +1,31 @@
 ---
-performance_profile_name: "openshift-node-performance-profile"
+kubeletconfig_annotation: '{"allowedUnsafeSysctls":["net.core.somaxconn","kernel.msg*","net.ipv6.conf.all.accept_ra","net.ipv6.conf.default.accept_ra","net.ipv6.conf.all.disable_ipv6","net.ipv4.conf.default.disable_policy","net.ipv4.conf.all.disable_policy","net.ipv6.conf.default.disable_policy","net.ipv6.conf.all.disable_policy","net.ipv4.conf.default.rp_filter","net.ipv4.conf.all.rp_filter"],"systemReserved":{"memory":"500Mi"},"kubeReserved":{"memory": "500Mi"}}'
 additional_kernel_args:
+  - nmi_watchdog=0
+  - audit=1
+  - mce=off
+  - processor.max_cstate=1
+  - intel_idle.max_cstate=0
   - rcupdate.rcu_normal_after_boot=0
-  - efi=runtime
-  - module_blacklist=irdma
-cpu_isolated: 2-31,34-63
-cpu_reserved: 0-1,32-33
+  - iommu=pt
+  - intel_iommu=on
+cpu_config:
+  MNO:
+    master:
+      isolated: "5-27,33-55"
+      reserved: "0-4,28-32"
+    worker:
+      isolated: "2-3,6-11"
+      reserved: "0-1,4-5"
+  SNO:
+    master:
+      isolated: "2-19,22-39"
+      reserved: "0-1,20-21"
 globally_disable_irq_load_balancing: false
 default_hugepages_size: 1G
-pages_count: 32
+pages_count:
+  MNO: "56"
+  SNO: "21"
 pages_size: 1G
-numa_topology_policy: restricted
-real_time_kernel_enabled: true
+numa_topology_policy: best-effort
+real_time_kernel_enabled: false
