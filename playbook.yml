@@ -1,24 +1,44 @@
 ---
-- name: Example playbook
+- name: Upgrade OpenShift Cluster Playbook
   hosts: localhost
   gather_facts: false
   environment:
   # Make sure to set 'path_to_kubeconfig' to the correct path where your kubeconfig file resides.
-    KUBECONFIG: "{{path_to_kubeconfig}}/kubeconfig"
+    KUBECONFIG: kubeconfig
   # Define the required collections to be used in this playbook.
+  vars:
+    upgrade_channel: "stable-4.12"
+    desired_update: "4.12.22"
   collections:
     - community.kubernetes
     - kubernetes.core
   roles:
-    - role: ocp-label-nodes
-    - role: ocp-mcp-pause
-      vars:
-        machineconfigpool_name: master
-        machineconfigpool_paused: true
-    - role: ocp-logging
-    - role: ocp-sriov
+    - role: ocp-gather-facts
+    # - role: ocp-mirror  # name TBC
+    # - role: ocp-upgrade
+    # - role: ocp-cluster-health
+    # - role: ocp-label-nodes
+    # - role: ocp-disable-console
+    # - role: ocp-local-storage
+    # - role: ocp-mcp-pause
+    #   vars:
+    #     machineconfigpool_paused: true
     - role: ocp-performance-profile
-    - role: ocp-mcp-pause
-      vars:
-        machineconfigpool_name: master
-        machineconfigpool_paused: false
+    # - role: ocp-ntp
+    # - role: ocp-load-kernel-modules
+    # - role: ocp-vlan-prun
+    # - role: ocp-sos
+    # - role: tuned-configuration
+    # - role: ocp-mcp-pause
+    #   vars:
+    #     machineconfigpool_paused: false
+    # - role: ocp-mcp-pause
+    #   vars:
+    #     machineconfigpool_paused: false
+    #     machineconfigpool_reset: true
+    # - role: ocp-sriov
+    # - role: ocp-ptp-install # name TBC
+    # - role: ocp-odf-install # name TBC
+    # - role: ocp-logging
+    # - role: ocp-create-user-admin
+    # - role: internal-registry-configuration # name TBC
