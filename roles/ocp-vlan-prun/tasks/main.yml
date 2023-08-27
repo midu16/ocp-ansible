@@ -1,26 +1,35 @@
 ---
 # tasks file for ocp-vlan-prun
 
+
+
+- name: Encode the enable_vlan_pruning_content content in base64
+  set_fact:
+    enable_vlan_pruning_base64_content: "{{enable_vlan_pruning_content | b64encode }}"
+
 # Task Apply the MachineConfigPool uses the k8s module to apply the generated MachineConfig for each node type (master and worker) in the OpenShift cluster.
 - name: Create MachineConfig
   k8s:
-    kind: MachineConfig
-    state: present
-    definition: |
+    definition:
       apiVersion: machineconfiguration.openshift.io/v1
       kind: MachineConfig
       metadata:
         labels:
-          machineconfiguration.openshift.io/role: {{ item }}
-        name: 20-enable-vlan-prunning-{{ item }}
+          machineconfiguration.openshift.io/role: "{{ item }}"
+        name: "20-enable-vlan-pruning-{{ item }}"
       spec:
         config:
           ignition:
             version: 3.2.0
           storage:
-            "{{enable_vlan_prunning_content}}"
+            files:
+              - contents:
+                  source: "data:text/plain;charset=utf-8;base64,{{ enable_vlan_pruning_base64_content }}"
+                mode: 493
+                path: /usr/local/bin/enable_vlan_pruning.sh
           systemd:
-            "{{kernel_unit_vlan_module_content}}"
-    validate:
-      fail_on_error: yes
-    loop: "{{ node_types }}"
+            units:
+              - name: kernel-module-vlan-setup.service
+                enabled: true
+                contents: "{{ kernel_unit_vlan_module_content }}"
+  loop: "{{ node_types }}"

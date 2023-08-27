@@ -19,31 +19,27 @@
   k8s:
     kind: MachineConfig
     state: present
-    definition: |
-      apiVersion: machineconfiguration.openshift.io/v1
-      kind: MachineConfig
+    name: "99-{{ item }}-toolboxrc-configuration"
+    definition:
       metadata:
         labels:
-          machineconfiguration.openshift.io/role: {{ item }}
-        name: 99-{{ item }}-toolboxrc-configuration
+          machineconfiguration.openshift.io/role: "{{ item }}"
       spec:
         config:
           ignition:
+            version: 3.1.0
             config: {}
             security:
               tls: {}
             timeouts: {}
-            version: 3.1.0
           networkd: {}
           passwd: {}
           storage:
             files:
             - contents:
-                source: {{ toolboxrc_base64_content }}
+                source: "{{ toolboxrc_base64_content }}"
               mode: 420
               overwrite: true
               path: /root/.toolboxrc
-        osImageURL: ''
-    validate:
-      fail_on_error: yes
-    loop: "{{ node_types }}"
+        osImageURL: ""
+  loop: "{{ node_types }}"

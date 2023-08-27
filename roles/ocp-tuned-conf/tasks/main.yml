@@ -1,0 +1,38 @@
+---
+# tasks file for roles/ocp-tuned-conf
+---
+# tasks file for tuned-configuration
+#
+# the prerequites tasks can be removed if we install kubernetes-validate as the others in the ocp-gather-facts roles
+- name: install pre-requisites
+  pip:
+    name:
+      - openshift
+      - pyaml
+      - kubernetes
+      - kubernetes-validate
+
+- name: "Create Tuned profile for {{item}}"
+  k8s:
+    state: present
+    definition:
+      apiVersion: tuned.openshift.io/v1
+      kind: Tuned
+      metadata:
+        name: "performance-patch-{{item}}"
+        namespace: openshift-cluster-node-tuning-operator
+      spec:
+        profile:
+          - data: |
+              [main]
+              summary=Custom tuned profile to adjust performance
+              include=openshift-node-performance-{{item}}-profile
+              [bootloader]
+              cmdline_removeKernelArgs=-nohz_full=${isolated_cores}
+            name: "performance-patch-{{item}}"
+        recommend:
+          - machineConfigLabels:
+              machineconfiguration.openshift.io/role: "{{item}}"
+            priority: 19
+            profile: "performance-patch-{{item}}"
+  loop: "{{ node_types }}"
