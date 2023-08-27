@@ -1,0 +1,21 @@
+---
+# tasks file for roles/ocp-console-disable
+
+
+- name: Create Console resource
+  k8s:
+    api_version: operator.openshift.io/v1
+    kind: Console
+    state: present
+    definition:
+      apiVersion: operator.openshift.io/v1
+      kind: Console
+      metadata:
+        annotations:
+          include.release.openshift.io/ibm-cloud-managed: 'false'
+          include.release.openshift.io/self-managed-high-availability: 'false'
+          include.release.openshift.io/single-node-developer: 'false'
+          release.openshift.io/create-only: 'true'
+        name: cluster
+      spec:
+        managementState: Removed
