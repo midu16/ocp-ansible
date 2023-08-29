@@ -29,7 +29,7 @@
                 path: /usr/local/bin/enable_vlan_pruning.sh
           systemd:
             units:
-              - name: kernel-module-vlan-setup.service
+              - contents: "{{ kernel_unit_vlan_module_content }}"
                 enabled: true
-                contents: "{{ kernel_unit_vlan_module_content }}"
+                name: kernel-module-vlan-setup.service
   loop: "{{ node_types }}"

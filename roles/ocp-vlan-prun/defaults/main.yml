@@ -15,21 +15,32 @@ enable_vlan_pruning_content: |
       fi
   done
 
-kernel_unit_vlan_module_content: | 
-    units:
-    - contents: '[Unit]
-        Description=enable vlan pruning
-        After=docker.service
-        After=oot-driver-load.service
-        Before=kubelet.service
-        [Service]
-        Type=oneshot
-        TimeoutStartSec=25m
-        RemainAfterExit=true
-        ExecStart=/usr/local/bin/enable_vlan_pruning.sh
-        StandardOutput=journal+console
-        [Install]
-        WantedBy=default.target
-        '
-      enabled: true
-      name: vlan-pruning.service
+kernel_unit_vlan_module_content: '[Unit]
+
+          Description=enable vlan pruning
+
+          After=docker.service
+
+          After=oot-driver-load.service
+
+          Before=kubelet.service
+
+
+          [Service]
+
+          Type=oneshot
+
+          TimeoutStartSec=25m
+
+          RemainAfterExit=true
+
+          ExecStart=/usr/local/bin/enable_vlan_pruning.sh
+
+          StandardOutput=journal+console
+
+
+          [Install]
+
+          WantedBy=default.target
+
+          '
