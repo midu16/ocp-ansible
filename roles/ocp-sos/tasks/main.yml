@@ -9,10 +9,6 @@
       - pyyaml
       - kubernetes
     
-# Task Encode the toolboxrc_content content in base64 encodes the toolboxrc_content variable (assumed to be defined elsewhere) in base64 and stores the result in the encoded_variable fact.
-- name: Encode the toolboxrc_content content in base64
-  set_fact:
-    toolboxrc_base64_content: "{{ toolboxrc_content | b64encode }}"
 
 # Task Apply the MachineConfigPool uses the k8s module to apply the generated MachineConfig for each node type (master and worker) in the OpenShift cluster.
 - name: Create MachineConfig
@@ -37,7 +33,7 @@
           storage:
             files:
             - contents:
-                source: "{{ toolboxrc_base64_content }}"
+                source: "data:text/plain;charset=utf-8;base64,{{ toolboxrc_content | b64encode }}"
               mode: 420
               overwrite: true
               path: /root/.toolboxrc
