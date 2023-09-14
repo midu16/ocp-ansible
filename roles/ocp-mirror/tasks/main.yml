@@ -1,124 +1,71 @@
 ---
-# tasks file for roles/ocp-mirror
-- name: Determine OS and Architecture
-  set_fact:
-    os_distribution: "{{ ansible_facts['os_family'] | lower }}"
-    os_architecture: "{{ ansible_architecture }}"
-    ocp_version: "{{ocp_release_version}}"
-    download_url_path: "https://mirror.openshift.com/pub/openshift-v4/"
-    registry_url: "https://{{registry_fqdn}}:{{registry_port}}/v2/_catalog"
-
-
-- name: Set Download URL for x86_64 architecture for oc-client
-  block:
-    - name: Set the Download URL for Redhat distributio
-      set_fact:
-        oc_cli_download_url: "{{download_url_path}}/{{os_architecture}}/clients/ocp/{{ocp_version}}/openshift-client-linux-{{ocp_version}}.tar.gz"
-      when: os_distribution == "redhat" # Replace with your desired Linux distribution
-    - name: Set the Download URL for macOS distribution
-      set_fact:
-        oc_cli_download_url: "{{download_url_path}}/{{os_architecture}}/clients/ocp/{{ocp_version}}/openshift-client-mac-{{ocp_version}}.tar.gz"
-      when: os_distribution == "darwin" # macOS distribution
-
-    # All the binaries will be kept in the same directory on the ${HOME} of the OS
-    - name: Create the {{ ansible_env.HOME }}/.oc-mirror-directory
-      file:
-        path: "{{ ansible_env.HOME }}/.oc-mirror"
-        state: directory
-        mode: "0775"
-  when: os_architecture == "x86_64"
-
-- name: Set Download URL for arm64 architecture for oc-client
-  block:
-    - name: Set the Download URL for Redhat distribution
-      set_fact:
-        oc_cli_download_url: "{{download_url_path}}/{{os_architecture}}/clients/ocp/{{ocp_version}}/openshift-client-linux-arm64-{{ocp_version}}.tar.gz"
-      when: os_distribution == "redhat" # Replace with your desired Linux distribution
-    - name: Set the Download URL for macOS distribution
-      set_fact:
-        oc_cli_download_url: "{{download_url_path}}/{{os_architecture}}/clients/ocp/{{ocp_version}}/openshift-client-mac-arm64-{{ocp_version}}.tar.gz"
-      when: os_distribution == "darwin" # macOS distribution
-
-    # All the binaries will be kept in the same directory on the ${HOME} of the OS
-    - name: Create the {{ ansible_env.HOME }}/.oc-mirror-directory
-      file:
-        path: "{{ ansible_env.HOME }}/.oc-mirror"
-        state: directory
-        mode: "0775"
-  when: os_architecture == "arm64"
-
-- name: Set Download URL for Redhat distribution for oc-mirror-client
-  block:
-    - name: Set the Download URL for x86_64 architecture
-      set_fact:
-        oc_mirror_cli_download_url: "{{download_url_path}}/{{os_architecture}}/clients/ocp/{{ocp_version}}/oc-mirror.tar.gz"
-      when: os_architecture == "x86_64" # Replace with your desired arhchitecture
-    - name: Set the Download URL for arm64 architecture
-      set_fact:
-        oc_mirror_cli_download_url: "{{download_url_path}}/{{os_architecture}}/clients/ocp/{{ocp_version}}/oc-mirror.tar.gz"
-      when: os_architecture == "arm64" # Replace with your desired arhchitecture
-  when: os_distribution == "redhat" or os_distribution == "fedora" 
-
-- name: Render Containerfile.j2 template
-  template:
-    src: Containerfile.j2
-    dest: "{{ ansible_env.HOME }}/.oc-mirror-directory/Containerfile"
-  delegate_to: localhost
-
-- name: Build the container image
-  docker_image:
-    name: "oc_kubeadm_mirror"
-    path: "{{ ansible_env.HOME }}/.oc-mirror-directory/Containerfile"
+- name: Install required packages (Podman and httpd-tools)
+  package:
+    name: "{{ item }}"
     state: present
+  loop:
+    - podman
+    - httpd-tools
+  become: true
 
-- name: Create a directory on the target host for mounting
+- name: Create directory structure
   file:
-    path: "{{ ansible_env.HOME }}/.oc-mirror-directory/app"
+    path: "{{ item }}"
     state: directory
-    mode: '0755'
-# Template the imageset-config.yaml file for the ocp release, template the pull-secret from RH and for the OfflineRegistry
+    recurse: true
+  loop:
+    - "{registry_data_dir}"
+    - "{registry_auth_dir}"
+    - "{registry_certs_dir}"
 
-# Template the imageset-config.yaml file of each new ocp-release and notify the Mirror ocp release to create the tar.gz bundle
-- name: Template imageset-config.yaml
-  template:
-    src: "imageset-config.yaml.j2"
-    dest: "{{ ansible_env.HOME }}/.oc-mirror/imageset-config.yaml"
-  notify:  Mirror ocp release 
+- name: Generate SSL Key and Certificate
+  openssl_certificate:
+    path: "{registry_certs_dir}/domain.crt"
+    privatekey_path: "{registry_certs_dir}/domain.key"
+    privatekey_type: rsa
+    privatekey_passphrase: ""
+    common_name: "{{ cert_cn }}"
+    bits: 4096
+    days: 365
+    force: yes
+    state: present
+    selfsigned: yes
+    subject: "/C={{ cert_c }}/ST={{ cert_s }}/L={{ cert_l }}/O={{ cert_o }}/OU={{ cert_ou }}/CN={{ cert_cn }}"
+    extensions:
+      - subjectAltName=DNS:{{ host_fqdn }}
+  when: cert_cn is defined and host_fqdn is defined
+  become: true
 
-# podman run -d --rm -it --name oc_mirror --net="host" --ipc=host -v /app:/app:z oc_kubeadm_mirror:latest
-- name: Run the Docker container with volume mounted
-  docker_container:
-    name: oc_mirror
-    image: localhost/oc_kubeadm_mirror:latest
-    state: started
-    volumes:
-      - "/app:/app:z"
-      - ""
+- name: Copy domain.crt to CA trust anchors directory
+  copy:
+    src: "{registry_certs_dir}/domain.crt"
+    dest: /etc/pki/ca-trust/source/anchors/
+    mode: '0644'
+  become: true
+  register: copy_result
+
+- name: Update CA trust
+  command: update-ca-trust
+  become: true
+  when: copy_result.changed
+
+- name: Run Offline Registry Container
+  ansible.builtin.podman_container:
+    name: ocpdiscon-registry
+    image: quay.io/midu/registry:latest
     ports:
-      - "80:80"
-# Create the ocp-release.tar.gz file and validate that the size its always maintained to the same level
-
-
-# Validate the connectivity to the Offline Registry can be established and if not, dont push the .tar.gz
-# curl -X GET -u pi:raspberry https://inbacrnrdl0100.offline.oxtechnix.lan:5000/v2/_catalog | jq .
-- name: Perform curl request with authentication
-  uri:
-    url: "{{ registry_url }}"                           # registry_fqdn and registry_port are defined in the defaults/main.yaml and can be changed during playbook definition
-    method: GET
-    user: "{{ registry_username }}"                     # Secrets should be managed in the vault
-    password: "{{ registry_password }}"                 # Secrets should be managed in the vault
-    status_code: 200                                    # Expected status code for a successful response
-    validate_certs: no                                  # Set to 'yes' if you want to validate SSL certificates
-  register: response
-- name: Extract response content
-  set_fact:
-    response_content: "{{ response.content | from_json }}"
-- name: Validate connectivity to the registry
-  assert:
-    that:
-      - response.status == 200
-      - response_content is defined
-      - response_content|length > 0
-  fail_msg: "Failed to establish connectivity to the offline registry."
-  success_msg: "Successfully connected to the offline registry."
-
+      - "5000:5000"
+    env:
+      REGISTRY_AUTH: htpasswd
+      REGISTRY_AUTH_HTPASSWD_REALM: Registry
+      REGISTRY_HTTP_SECRET: ALongRandomSecretForRegistry
+      REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
+      REGISTRY_HTTP_TLS_CERTIFICATE: /certs/domain.crt
+      REGISTRY_HTTP_TLS_KEY: /certs/domain.key
+      REGISTRY_COMPATIBILITY_SCHEMA1_ENABLED: true
+      REGISTRY_STORAGE_DELETE_ENABLED: true
+    volumes:
+      - "{registry_data_dir}:/var/lib/registry:z"
+      - "{registry_auth_dir}:/auth:z"
+      - "{registry_certs_dir}:/certs:z"
+    state: started
