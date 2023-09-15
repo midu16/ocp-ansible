@@ -5,23 +5,26 @@
 #    var: ansible_facts['distribution']
 
 # Installing the dependencies required
-- name: Install required packages (Podman and httpd-tools)
+- name: Install required packages (Podman, httpd-tools and python3.11)
   package:
     name: "{{ item }}"
     state: present
   loop:
     - podman
     - httpd-tools
+    - python3.11
   become: true
-  when: "'Red Hat' in ansible_facts['distribution']"
+  when: "'RedHat' in ansible_facts['distribution']"
 
-- name: install pre-requisites
+- name: Install required pip packages (openshift, pyyaml, kubernetes and passlib)
   pip:
     name:
       - openshift
       - pyyaml
       - kubernetes
       - passlib
+  become: true
+  when: "'RedHat' in ansible_facts['distribution']"
 
 - name: Collect only facts returned by facter
   ansible.builtin.setup:
@@ -142,6 +145,18 @@
 
   # Changing the file structure and files permission to the system username
   # This measure its ensuring that we are not going to rely on the root or any elevated system user
+  - name: Change ownership of directories
+    file:
+      path: "{{ item }}"
+      recurse: yes
+      owner: midu  # Replace with the desired owner
+      group: midu  # Replace with the desired group
+    loop: 
+      - "{{ registry_data_dir }}"
+      - "{{ registry_auth_dir }}"
+      - "{{ registry_certs_dir }}"
+    become: true
+
   - name: Run Offline Registry Container
     containers.podman.podman_container:
       name: ocpdiscon-registry
