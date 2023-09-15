@@ -1,4 +1,10 @@
 ---
+
+#- name: Display Host OS Distribution
+#  debug:
+#    var: ansible_facts['distribution']
+
+# Installing the dependencies required
 - name: Install required packages (Podman and httpd-tools)
   package:
     name: "{{ item }}"
@@ -7,65 +13,170 @@
     - podman
     - httpd-tools
   become: true
+  when: "'Red Hat' in ansible_facts['distribution']"
 
-- name: Create directory structure
-  file:
-    path: "{{ item }}"
-    state: directory
-    recurse: true
-  loop:
-    - "{registry_data_dir}"
-    - "{registry_auth_dir}"
-    - "{registry_certs_dir}"
+- name: install pre-requisites
+  pip:
+    name:
+      - openshift
+      - pyyaml
+      - kubernetes
+      - passlib
 
-- name: Generate SSL Key and Certificate
-  openssl_certificate:
-    path: "{registry_certs_dir}/domain.crt"
-    privatekey_path: "{registry_certs_dir}/domain.key"
-    privatekey_type: rsa
-    privatekey_passphrase: ""
-    common_name: "{{ cert_cn }}"
-    bits: 4096
-    days: 365
-    force: yes
-    state: present
-    selfsigned: yes
-    subject: "/C={{ cert_c }}/ST={{ cert_s }}/L={{ cert_l }}/O={{ cert_o }}/OU={{ cert_ou }}/CN={{ cert_cn }}"
-    extensions:
-      - subjectAltName=DNS:{{ host_fqdn }}
-  when: cert_cn is defined and host_fqdn is defined
-  become: true
+- name: Collect only facts returned by facter
+  ansible.builtin.setup:
+    gather_subset:
+      - '!all'
+      - '!<any valid subset>'
+      - facter
 
-- name: Copy domain.crt to CA trust anchors directory
-  copy:
-    src: "{registry_certs_dir}/domain.crt"
-    dest: /etc/pki/ca-trust/source/anchors/
-    mode: '0644'
-  become: true
-  register: copy_result
+- name: Offline Registry Deployment
+  tags: offline-registry
+  block:
+  # Make sure that the directories exists otherwise those will be created
+  - name: Check if directories exist
+    stat:
+      path: "{{ item }}"
+    loop:
+      - "{{ registry_data_dir }}"
+      - "{{ registry_auth_dir }}"
+      - "{{ registry_certs_dir }}"
+    register: dir_check_results
+    ignore_errors: true
 
-- name: Update CA trust
-  command: update-ca-trust
-  become: true
-  when: copy_result.changed
+  # Create the directories if not existing already
+  - name: Create directory structure if needed
+    file:
+      path: "{{ item.item }}"
+      state: directory
+      recurse: yes
+    loop: "{{ dir_check_results.results }}"
+    when: not item.stat.exists
+    become: true
+  #- name: Create directory structure
+  #  file:
+  #    path: "{{ item }}"
+  #    state: directory
+  #    recurse: true
+  #  loop:
+  #    - "{registry_data_dir}"
+  #    - "{registry_auth_dir}"
+  #    - "{registry_certs_dir}"
 
-- name: Run Offline Registry Container
-  ansible.builtin.podman_container:
-    name: ocpdiscon-registry
-    image: quay.io/midu/registry:latest
-    ports:
-      - "5000:5000"
-    env:
-      REGISTRY_AUTH: htpasswd
-      REGISTRY_AUTH_HTPASSWD_REALM: Registry
-      REGISTRY_HTTP_SECRET: ALongRandomSecretForRegistry
-      REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
-      REGISTRY_HTTP_TLS_CERTIFICATE: /certs/domain.crt
-      REGISTRY_HTTP_TLS_KEY: /certs/domain.key
-      REGISTRY_COMPATIBILITY_SCHEMA1_ENABLED: true
-      REGISTRY_STORAGE_DELETE_ENABLED: true
-    volumes:
-      - "{registry_data_dir}:/var/lib/registry:z"
-      - "{registry_auth_dir}:/auth:z"
-      - "{registry_certs_dir}:/certs:z"
-    state: started
+  #- name: Generate SSL Key and Certificate
+  #  openssl_certificate:
+  #    path: "{registry_certs_dir}/domain.crt"
+  #    privatekey_path: "{registry_certs_dir}/domain.key"
+  #    signature_algorithms:
+  #      - sha256WithRSAEncryption
+  #    privatekey_passphrase: ""
+  #    size: 4096
+  #    force: yes
+  #    state: present
+  #    provider: selfsigned
+  #    selfsigned_digest: sha256
+  #    subject: "/C={{ cert_c }}/ST={{ cert_s }}/L={{ cert_l }}/O={{ cert_o }}/OU={{ cert_ou }}/CN={{ cert_cn }}"
+  #    subject_alt_name:
+  #      - subjectAltName=DNS:{{ host_fqdn }}
+  #  when: cert_c is defined and cert_s is defined and cert_l is defined and cert_o is defined and cert_ou is defined and host_fqdn is defined
+  #  become: true
+
+  - name: Generate a self-signed private key
+    community.crypto.openssl_privatekey:
+      path: "{{registry_certs_dir}}/domain.key"
+      size: 4096
+      mode: 0600
+      type: RSA
+      regenerate: "full_idempotence"
+      state: present
+    become: true
+
+  - name: Create certificate signing request (CSR) for self-signed certificate
+    community.crypto.openssl_csr_pipe:
+      privatekey_path: "{{registry_certs_dir}}/domain.key"
+      country_name: "{{ cert_c }}"
+      state_or_province_name: "{{ cert_s }}"
+      locality_name: "{{ cert_l }}"
+      organization_name: "{{ cert_o }}"
+      organizational_unit_name: "{{ cert_ou }}"
+      common_name: "{{ cert_cn }}"
+      subject_alt_name: "DNS:{{ host_fqdn }}"
+      subject_alt_name_critical: true
+    register: csr
+    become: true
+
+  - name: Generate a self-signed SSL/TLS certificate (valid for 10 years)
+    community.crypto.x509_certificate:
+      path: "{{registry_certs_dir}}/domain.crt"
+      privatekey_path: "{{registry_certs_dir}}/domain.key"
+      csr_content: "{{ csr.csr }}"
+      provider: selfsigned
+      selfsigned_not_after: "+3650d"
+      mode: 0644
+    become: true
+
+  - name: Copy domain.crt to CA trust anchors directory
+    copy:
+      src: "{{registry_certs_dir}}/domain.crt"
+      dest: /etc/pki/ca-trust/source/anchors/
+      mode: '0644'
+    become: true
+    register: copy_result
+    notify:
+        - restart ocpdiscon-registry
+
+  - name: Update CA trust
+    command: update-ca-trust
+    become: true
+    when: copy_result.changed
+
+  - name: Add a user to the Offline Registry
+    community.general.htpasswd:
+      path: "{{registry_auth_dir}}/htpasswd"
+      name: pi
+      password: 'raspberry'
+      owner: root
+      hash_scheme: sha256_crypt
+      mode: 0640
+    become: true
+
+  # Changing the file structure and files permission to the system username
+  # This measure its ensuring that we are not going to rely on the root or any elevated system user
+  - name: Run Offline Registry Container
+    containers.podman.podman_container:
+      name: ocpdiscon-registry
+      image: quay.io/midu/registry:latest
+      ports:
+        - "5000:5000"
+      env:
+        REGISTRY_AUTH: htpasswd
+        REGISTRY_AUTH_HTPASSWD_REALM: Registry
+        REGISTRY_HTTP_SECRET: ALongRandomSecretForRegistry
+        REGISTRY_AUTH_HTPASSWD_PATH: /auth/htpasswd
+        REGISTRY_HTTP_TLS_CERTIFICATE: /certs/domain.crt
+        REGISTRY_HTTP_TLS_KEY: /certs/domain.key
+        REGISTRY_COMPATIBILITY_SCHEMA1_ENABLED: true
+        REGISTRY_STORAGE_DELETE_ENABLED: true
+      volumes:
+        - "{{registry_data_dir}}:/var/lib/registry:z"
+        - "{{registry_auth_dir}}:/auth:z"
+        - "{{registry_certs_dir}}:/certs:z"
+      state: started
+
+  - name: Generate systemd service unit file for Podman container
+    containers.podman.podman_generate_systemd:
+      name: ocpdiscon-registry
+      state: present
+      destination: "{{ lookup('env', 'HOME') }}/.config/systemd/user/"
+    register: systemd_generation_result
+
+  - name: Show systemd generation result
+    debug:
+      var: systemd_generation_result
+
+#  handlers:
+#      - name: restart ocpdiscon-registry
+#        systemd:
+#          name: ocpdiscon-registry
+#          enabled: yes
+#          state: restarted

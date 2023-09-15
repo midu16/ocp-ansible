@@ -1,7 +1,7 @@
 ---
 - name: Upgrade OpenShift Cluster Playbook
   hosts: localhost
-  gather_facts: false
+  gather_facts: true
   environment:
   # Make sure to set 'path_to_kubeconfig' to the correct path where your kubeconfig file resides.
     KUBECONFIG: kubeconfig
@@ -13,8 +13,8 @@
     - community.kubernetes
     - kubernetes.core
   roles:
-    - role: ocp-gather-facts
-    # - role: ocp-mirror  # name TBC
+    # - role: ocp-gather-facts
+     - role: ocp-mirror  # name TBC
     # - role: ocp-upgrade
     # - role: ocp-cluster-health
     # - role: ocp-label-nodes
@@ -23,7 +23,7 @@
     # - role: ocp-mcp-pause
     #   vars:
     #     machineconfigpool_paused: true
-    - role: ocp-performance-profile
+    # - role: ocp-performance-profile
     # - role: ocp-ntp
     # - role: ocp-load-kernel-modules
     # - role: ocp-vlan-prun

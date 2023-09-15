@@ -1,12 +1,23 @@
 Role Name
 =========
 
-A brief description of the role goes here.
+This role scope its to deploy a local environment Offline Registry 
 
 Requirements
 ------------
 
 Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+
+You might already have this collection installed if you are using the ansible package. It is not included in ansible-core. To check whether `podman_container` it is installed, run ansible-galaxy collection list.
+
+To install it, use: 
+
+```bash
+ansible-galaxy collection install containers.podman
+ansible-galaxy collection install community.crypto
+ansible-galaxy collection install community.general
+```
+
 
 Role Variables
 --------------
@@ -35,4 +46,4 @@ BSD
 Author Information
 ------------------
 
-An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+midu16
