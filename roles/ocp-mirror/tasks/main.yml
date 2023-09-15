@@ -139,7 +139,7 @@
       name: pi
       password: 'raspberry'
       owner: root
-      hash_scheme: sha256_crypt
+      crypt_scheme: bcrypt
       mode: 0640
     become: true
 
