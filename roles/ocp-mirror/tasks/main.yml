@@ -13,6 +13,7 @@
     - podman
     - httpd-tools
     - python3.11
+    - libselinux-python3
   become: true
   when: "'RedHat' in ansible_facts['distribution']"
 
@@ -23,6 +24,7 @@
       - pyyaml
       - kubernetes
       - passlib
+      - pyOpenSSL
   become: true
   when: "'RedHat' in ansible_facts['distribution']"
 
@@ -44,6 +46,7 @@
       - "{{ registry_data_dir }}"
       - "{{ registry_auth_dir }}"
       - "{{ registry_certs_dir }}"
+      - "{{ imageset_directory }}"
     register: dir_check_results
     ignore_errors: true
 
@@ -66,13 +69,16 @@
       mode: '0775'
       type: RSA
       format: pkcs1
+      cipher: sha256
+      passphrase: ""
       regenerate: "full_idempotence"
       return_content: false
       state: present
     become: true
 
   - name: Create certificate signing request (CSR) for self-signed certificate
-    community.crypto.openssl_csr_pipe:
+    community.crypto.openssl_csr:
+      path: "{{registry_certs_dir}}/domain-reg.csr"
       privatekey_path: "{{registry_certs_dir}}/domain-reg.key"
       country_name: "{{ cert_c }}"
       state_or_province_name: "{{ cert_s }}"
@@ -82,14 +88,13 @@
       common_name: "{{ cert_cn }}"
       subject_alt_name: "DNS:{{ host_fqdn }}"
       subject_alt_name_critical: true
-    register: csr
     become: true
 
-  - name: Generate a self-signed SSL/TLS certificate (valid for 10 years)
+  - name: Generate a self-signed SSL/TLS certificate (valid for 1 years)
     community.crypto.x509_certificate:
       path: "{{registry_certs_dir}}/domain-reg.crt"
       privatekey_path: "{{registry_certs_dir}}/domain-reg.key"
-      csr_content: "{{ csr.csr }}"
+      csr_path: "{{registry_certs_dir}}/domain-reg.csr"
       provider: selfsigned
       selfsigned_not_after: "+365d"
       mode: '0775'
@@ -181,3 +186,24 @@
 #          name: ocpdiscon-registry
 #          enabled: yes
 #          state: restarted
+
+- name: Copy file from Ansible role to localhost
+  copy:
+    src: "{{ role_path }}/files/release_versions.yml"
+    dest: "{{imageset_directory}}/release_versions.yml"
+    setype: user_home_t
+    seuser: unconfined_u
+    selevel: s0
+    mode: '0664'
+  delegate_to: localhost
+
+- name: Template the imageset-config.yaml file
+  containers.podman.podman_container:
+    name: imageset-config-templater
+    image: quay.io/midu/imageset-config-release-templater:latest
+    env:
+      RELEASE_VERSION: "23R3"
+      RELEASE_PROFILE: "CU"
+    volumes:
+      - "{{imageset_directory}}:/cluster-operators:z"
+    state: started

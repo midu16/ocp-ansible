@@ -10,3 +10,4 @@ registry_auth_dir: "{{ registry_directory }}/auth"
 registry_certs_dir: "{{ registry_directory }}/certs"
 registry_username: myuser
 registry_password: mypassword
+imageset_directory: /apps/cluster-operators
