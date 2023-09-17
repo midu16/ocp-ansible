@@ -12,3 +12,6 @@ registry_username: 'pi'
 registry_password: 'raspberry'
 imageset_directory: /apps/cluster-operators
 pull_secret_directory: "/home/{{username}}/.docker"
+
+release_profile: "DU"
+release_version: "23R3"

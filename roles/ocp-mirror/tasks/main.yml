@@ -244,8 +244,8 @@
     name: imageset-config-templater
     image: quay.io/midu/imageset-config-release-templater:latest
     env:
-      RELEASE_VERSION: "23R3"
-      RELEASE_PROFILE: "CU"
+      RELEASE_VERSION: "{{release_version}}"
+      RELEASE_PROFILE: "{{release_profile}}"
     volumes:
       - "{{imageset_directory}}:/cluster-operators:z"
     state: started
