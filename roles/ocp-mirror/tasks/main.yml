@@ -250,4 +250,13 @@
       - "{{imageset_directory}}:/cluster-operators:z"
     state: started
 
-#- name: Starting the mirroring process
+# This task will start the mirroring process
+# and prepare the internal release
+- name: Starting the mirroring process
+  containers.podman.podman_container:
+    name: oc-kubeadmin-mirror
+    image: quay.io/midu/oc-kubeadmin-mirror:latest
+    volumes:
+      - "{{imageset_directory}}:/cluster-operators:z"
+      - "{{pull_secret_directory}}:/home/admin/.docker:z"
+    state: started
