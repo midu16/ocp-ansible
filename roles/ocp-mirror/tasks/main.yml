@@ -1,11 +1,12 @@
 ---
-
-#- name: Display Host OS Distribution
-#  debug:
-#    var: ansible_facts['distribution']
+# Display the Host OS Distribution 
+# Reason its that because this role only support RedHat and Fedora
+- name: Display Host OS Distribution
+  debug:
+    var: ansible_facts['distribution']
 
 # Installing the dependencies required
-- name: Install required packages (Podman, httpd-tools and python3.11)
+- name: Install required packages (Podman, httpd-tools, python3.11, python3-pip and libselinux-python3)
   package:
     name: "{{ item }}"
     state: present
@@ -13,11 +14,12 @@
     - podman
     - httpd-tools
     - python3.11
+    - python3-pip
     - libselinux-python3
   become: true
-  when: "'RedHat' in ansible_facts['distribution']"
+  when: "'RedHat' in ansible_facts['distribution'] or 'Fedora' in ansible_facts['distribution']"
 
-- name: Install required pip packages (openshift, pyyaml, kubernetes and passlib)
+- name: Install required pip packages (openshift, pyyaml, kubernetes, passlib and pyOpenSSL)
   pip:
     name:
       - openshift
@@ -25,8 +27,14 @@
       - kubernetes
       - passlib
       - pyOpenSSL
-  become: true
-  when: "'RedHat' in ansible_facts['distribution']"
+  when: "'RedHat' in ansible_facts['distribution'] or 'Fedora' in ansible_facts['distribution']"
+
+- name: Install roles from Ansible Galaxy
+  command: ansible-galaxy collection install {{ item }}
+  with_items:
+    - containers.podman
+    - community.crypto
+    - community.general
 
 - name: Collect only facts returned by facter
   ansible.builtin.setup:
@@ -34,6 +42,10 @@
       - '!all'
       - '!<any valid subset>'
       - facter
+
+- name: OpenShift Release Upgrade Details
+  set_fact:
+    release_versions: "{{ lookup('file', '{{role_path}}/files/release_versions.yml') }}"
 
 # Check if the ocpdiscon-registry is running 
 #if true skip the Offline Registry Deployment block otherwise do it
@@ -65,12 +77,28 @@
   - name: Create directory structure if needed
     file:
       path: "{{ item.item }}"
-      owner: midu  # Replace with the desired owner
-      group: midu  # Replace with the desired group
+      owner: "{{username}}"  # Replace with the desired owner
+      group: "{{group}}"  # Replace with the desired group
       state: directory
       recurse: yes
     loop: "{{ dir_check_results.results }}"
     when: not item.stat.exists
+    become: true
+
+  # Changing the file structure and files permission to the system username
+  # This measure its ensuring that we are not going to rely on the root or any elevated system user
+  - name: Change ownership of directories
+    file:
+      path: "{{ item }}"
+      recurse: yes
+      owner: "{{username}}"  # Replace with the desired owner
+      group: "{{group}}"  # Replace with the desired group
+    loop: 
+      - "{{ imageset_directory }}"
+      - "{{ registry_directory }}"
+      - "{{ registry_data_dir }}"
+      - "{{ registry_auth_dir }}"
+      - "{{ registry_certs_dir }}"
     become: true
 
   - name: Generate a self-signed private key
@@ -118,8 +146,6 @@
       mode: '0775'
     become: true
     register: copy_result
-#    notify:
-#        - restart ocpdiscon-registry
 
   - name: Update CA trust
     command: update-ca-trust
@@ -129,25 +155,12 @@
   - name: Add a user to the Offline Registry
     community.general.htpasswd:
       path: "{{registry_auth_dir}}/htpasswd"
-      name: pi
-      password: 'raspberry'
-      owner: root
+      name: "{{registry_username}}"
+      password: "{{registry_password}}"
+      owner: "{{username}}"  # Replace with the desired owner
+      group: "{{group}}"  # Replace with the desired group
       crypt_scheme: bcrypt
       mode: 0640
-    become: true
-
-  # Changing the file structure and files permission to the system username
-  # This measure its ensuring that we are not going to rely on the root or any elevated system user
-  - name: Change ownership of directories
-    file:
-      path: "{{ item }}"
-      recurse: yes
-      owner: midu  # Replace with the desired owner
-      group: midu  # Replace with the desired group
-    loop: 
-      - "{{ registry_data_dir }}"
-      - "{{ registry_auth_dir }}"
-      - "{{ registry_certs_dir }}"
     become: true
 
   - name: Run Offline Registry Container
@@ -179,10 +192,6 @@
       dest: "{{ lookup('env', 'HOME') }}/.config/systemd/user/"
     register: systemd_generation_result
 
-  #- name: Show systemd generation result
-  #  debug:
-  #    var: systemd_generation_result
-
   # Rootless systemd ocpdiscon-registry.service to manage LCM
   - name: Ensure ocpdiscon-registry container is started and enabled
     ansible.builtin.systemd:
@@ -191,12 +200,6 @@
       enabled: true
       daemon_reload: true
       scope: user
-#  handlers:
-#      - name: restart ocpdiscon-registry
-#        systemd:
-#          name: ocpdiscon-registry
-#          enabled: yes
-#          state: restarted
   when: ocpdiscon_registry_status.status.ActiveState != 'active'
 
 - name: Copy file from Ansible role to localhost
@@ -234,9 +237,6 @@
             mcg-operator: "4.12.5-rhodf"
             ocs-operator: "4.12.5-rhodf"
             odf-operator: "4.12.5-rhodf"
-    setype: user_home_t
-    seuser: unconfined_u
-    selevel: s0
     mode: '0664'
 
 - name: Template the imageset-config.yaml file
@@ -249,3 +249,5 @@
     volumes:
       - "{{imageset_directory}}:/cluster-operators:z"
     state: started
+
+#- name: Starting the mirroring process

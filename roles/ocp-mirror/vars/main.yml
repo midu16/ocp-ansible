@@ -1,11 +1,14 @@
 ---
 # vars file for roles/ocp-mirror
 
-cert_c: "US"
-cert_s: "California"
-cert_l: "Los Angeles"
-cert_o: "Example Inc."
+cert_c: "AT"
+cert_s: "Wien"
+cert_l: "Wien"
+cert_o: "Demo Inc."
 cert_ou: "IT"
 cert_cn: "{{host_fqdn}}"
-#host_fqdn: "{{ansible_hostname}}"
-host_fqdn: "midu.remote.csb"
+host_fqdn: "{{ansible_fqdn}}"
+
+# username and group filesystem permissions 
+username: fedora
+group: fedora

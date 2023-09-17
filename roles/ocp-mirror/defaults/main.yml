@@ -8,6 +8,6 @@ registry_directory: /apps/registry
 registry_data_dir: "{{ registry_directory }}/data"
 registry_auth_dir: "{{ registry_directory }}/auth"
 registry_certs_dir: "{{ registry_directory }}/certs"
-registry_username: myuser
-registry_password: mypassword
+registry_username: 'pi'
+registry_password: 'raspberry'
 imageset_directory: /apps/cluster-operators
