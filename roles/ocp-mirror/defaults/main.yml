@@ -1,6 +1,6 @@
 ---
 # defaults file for roles/ocp-mirror
-registry_fqdn: "inbacrnrdl0100.offline.oxtechnix.lan"
+registry_fqdn: "fedora.fritz.box"
 registry_port: "5000"
 
 # define the default variables for the registry dependency variables
@@ -14,4 +14,4 @@ imageset_directory: /apps/cluster-operators
 pull_secret_directory: "/home/{{system_user_username}}/.docker"
 
 release_profile: "DU"
-release_version: "23R3"
+release_version: "23R4"

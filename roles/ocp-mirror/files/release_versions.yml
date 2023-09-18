@@ -1,4 +1,3 @@
----
 23R3:
   ocp-release: "4.12.21"
   day2-operators:
