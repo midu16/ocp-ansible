@@ -1,12 +1,10 @@
 Role Name
 =========
 
-This role scope its to deploy a local environment Offline Registry 
+This role scope its to deploy a local environment Offline Registry and mirror the newly release
 
 Requirements
 ------------
-
-Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
 
 You might already have this collection installed if you are using the ansible package. It is not included in ansible-core. To check whether `podman_container` it is installed, run ansible-galaxy collection list.
 

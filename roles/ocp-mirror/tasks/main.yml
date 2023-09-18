@@ -50,13 +50,13 @@
 # Check if the ocpdiscon-registry is running 
 #if true skip the Offline Registry Deployment block otherwise do it
 - name: Get container-ocpdiscon-registry.service Status
-  ansible.builtin.systemd:
+  ansible.builtin.service_facts:
     name: "container-ocpdiscon-registry"
   register: ocpdiscon_registry_status
 # Display the status of the ocpdiscon-registry check
 - name: Display ocpdiscon_registry_status
   debug:
-    msg: "{{ocpdiscon_registry_status.status.ActiveState}}"
+    var: ocpdiscon_registry_status.state
 
 - name: Offline Registry Deployment
   tags: offline-registry
@@ -77,8 +77,8 @@
   - name: Create directory structure if needed
     file:
       path: "{{ item.item }}"
-      owner: "{{username}}"  # Replace with the desired owner
-      group: "{{group}}"  # Replace with the desired group
+      owner: "{{system_user_username}}"  # Replace with the desired owner
+      group: "{{system_user_group}}"  # Replace with the desired group
       state: directory
       recurse: yes
     loop: "{{ dir_check_results.results }}"
@@ -91,8 +91,8 @@
     file:
       path: "{{ item }}"
       recurse: yes
-      owner: "{{username}}"  # Replace with the desired owner
-      group: "{{group}}"  # Replace with the desired group
+      owner: "{{system_user_username}}"  # Replace with the desired owner
+      group: "{{system_user_group}}"  # Replace with the desired group
     loop: 
       - "{{ imageset_directory }}"
       - "{{ registry_directory }}"
@@ -157,8 +157,8 @@
       path: "{{registry_auth_dir}}/htpasswd"
       name: "{{registry_username}}"
       password: "{{registry_password}}"
-      owner: "{{username}}"  # Replace with the desired owner
-      group: "{{group}}"  # Replace with the desired group
+      owner: "{{system_user_username}}"  # Replace with the desired owner
+      group: "{{system_user_group}}"  # Replace with the desired group
       crypt_scheme: bcrypt
       mode: 0640
     become: true
@@ -200,7 +200,7 @@
       enabled: true
       daemon_reload: true
       scope: user
-  when: ocpdiscon_registry_status.status.ActiveState != 'active'
+  when: "ocpdiscon_registry_status.status.ActiveState != 'active' and 'RedHat' in ansible_facts['distribution'] or 'Fedora' in ansible_facts['distribution']"
 
 - name: Copy file from Ansible role to localhost
   copy:
@@ -254,9 +254,26 @@
 # and prepare the internal release
 - name: Starting the mirroring process
   containers.podman.podman_container:
-    name: oc-kubeadmin-mirror
-    image: quay.io/midu/oc-kubeadmin-mirror:latest
+    name: oc-mirror-locally
+    image: quay.io/midu/oc-mirror-local:latest
     volumes:
       - "{{imageset_directory}}:/cluster-operators:z"
       - "{{pull_secret_directory}}:/home/admin/.docker:z"
     state: started
+  tags:
+  - mirror_locally
+
+- name: Starting the mirroring process to Offline Registry
+  containers.podman.podman_container:
+    name: oc-kubeadmin-mirror
+    image: quay.io/midu/oc-kubeadmin-mirror:latest
+    env:
+      RELEASE_VERSION: "{{release_version}}"
+      OFFLINE_REGISTRY_FQDN: "{{registry_fqdn}}"
+      OFFLINE_REGISTRY_PORT: "{{registry_port}}"
+    volumes:
+      - "{{imageset_directory}}:/cluster-operators:z"
+      - "{{pull_secret_directory}}:/home/admin/.docker:z"
+    state: started
+  tags:
+  - mirror_offline_registry

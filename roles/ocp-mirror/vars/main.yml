@@ -10,5 +10,5 @@ cert_cn: "{{host_fqdn}}"
 host_fqdn: "{{ansible_fqdn}}"
 
 # username and group filesystem permissions 
-username: fedora
-group: fedora
+system_user_username: midu
+system_user_group: midu
