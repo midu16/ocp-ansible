@@ -43,10 +43,6 @@
       - '!<any valid subset>'
       - facter
 
-- name: OpenShift Release Upgrade Details
-  set_fact:
-    release_versions: "{{ lookup('file', '{{role_path}}/files/release_versions.yml') | from_yaml }}"
-
 # Check if the ocpdiscon-registry is running 
 #if true skip the Offline Registry Deployment block otherwise do it
 - name: Gather service facts
@@ -58,7 +54,7 @@
   when: "'container-ocpdiscon-registry' in services"
 
 - name: Offline Registry Deployment
-  tags: offline-registry
+  tags: offline_registry
   block:
   # Make sure that the directories exists otherwise those will be created
   - name: Check if directories exist
@@ -205,22 +201,47 @@
       scope: user
   when: "'container-ocpdiscon-registry' is not in services and 'RedHat' in ansible_facts['distribution'] or 'Fedora' in ansible_facts['distribution']"
 
-- name: Copy file from Ansible role to localhost
-  copy:
-    dest: "{{imageset_directory}}/release_versions.yml"
-    content: "{{ lookup('file', '{{role_path}}/files/release_versions.yml') }}"
-    mode: '0664'
-
 - name: Template the imageset-config.yaml file
-  containers.podman.podman_container:
-    name: imageset-config-templater
-    image: quay.io/midu/imageset-config-release-templater:latest
-    env:
-      RELEASE_VERSION: "{{release_version}}"
-      RELEASE_PROFILE: "{{release_profile}}"
-    volumes:
-      - "{{imageset_directory}}:/cluster-operators:z"
-    state: started
+  tags: imageset_config_template
+  block:
+  # Make sure that the directories exists otherwise those will be created
+  - name: Check if directories exist
+    stat:
+      path: "{{ item }}"
+    loop:
+      - "{{ imageset_directory }}"
+    register: dir_check_results
+    ignore_errors: true
+
+  # Create the directories if not existing already
+  - name: Create directory structure if needed
+    file:
+      path: "{{ item.item }}"
+      owner: "{{system_user_username}}"  # Replace with the desired owner
+      group: "{{system_user_group}}"  # Replace with the desired group
+      state: directory
+      recurse: yes
+    loop: "{{ dir_check_results.results }}"
+    when: not item.stat.exists
+    become: true
+
+  - name: Copy file from Ansible role to localhost
+    copy:
+      dest: "{{imageset_directory}}/release_versions.yml"
+      content: "{{ lookup('file', '{{role_path}}/files/release_versions.yml') }}"
+      mode: '0664'
+
+  - name: Template the imageset-config.yaml file
+    containers.podman.podman_container:
+      name: imageset-config-templater
+      image: quay.io/midu/imageset-config-release-templater:latest
+      env:
+        RELEASE_VERSION: "{{release_version}}"
+        RELEASE_PROFILE: "{{release_profile}}"
+      volumes:
+        - "{{imageset_directory}}:/cluster-operators:z"
+      state: started
+
 
 # This task will start the mirroring process
 # and prepare the internal release
@@ -235,18 +256,28 @@
   tags:
   - mirror_locally
 
-- name: Starting the mirroring process to Offline Registry
-  containers.podman.podman_container:
-    name: oc-kubeadmin-mirror
-    image: quay.io/midu/oc-kubeadmin-mirror:latest
-    env:
-      RELEASE_VERSION: "{{release_version}}"
-      OFFLINE_REGISTRY_FQDN: "{{registry_fqdn}}"
-      OFFLINE_REGISTRY_PORT: "{{registry_port}}"
-    volumes:
-      - "{{imageset_directory}}:/cluster-operators:z"
-      - "{{pull_secret_directory}}:/home/admin/.docker:z"
-    command: "oc-mirror --config /cluster-operators/imageset-config.yaml docker://fedora.fritz.box:5000/ocp-4.12.21-release.nokia --dest-skip-tls"
-    state: started
-  tags:
-  - mirror_offline_registry
+
+- name: Offline Mirroring
+  tags: mirror_offline_registry
+  block:
+  - name: OpenShift Release Upgrade Details
+    set_fact:
+      release_versions: "{{ lookup('file', '{{role_path}}/files/release_versions.yml') | from_yaml }}"
+
+  - name: Define ocp_release as a fact
+    set_fact:
+      ocp_release: release_versions['{{release_version}}']['ocp-release']
+
+  - name: Starting the mirroring process to Offline Registry
+    containers.podman.podman_container:
+      name: oc-kubeadmin-mirror
+      image: quay.io/midu/oc-kubeadmin-mirror:latest
+      env:
+        RELEASE_VERSION: "{{release_version}}"
+        OFFLINE_REGISTRY_FQDN: "{{registry_fqdn}}"
+        OFFLINE_REGISTRY_PORT: "{{registry_port}}"
+      volumes:
+        - "{{imageset_directory}}:/cluster-operators:z"
+        - "{{pull_secret_directory}}:/home/admin/.docker:z"
+      command: "oc-mirror --config /cluster-operators/imageset-config.yaml docker://{{registry_fqdn}}:{{registry_port}}/ocp-upgrade-release --dest-skip-tls"
+      state: started
