@@ -1,40 +1,86 @@
-Role Name
+Ansible Role: Display Host OS Distribution
 =========
 
-This role scope its to deploy a local environment Offline Registry and mirror the newly release
+This Ansible role is designed to perform the following tasks:
+
+- Display the distribution of the host operating system.
+- Install required packages and pip packages based on the host OS distribution.
+- Install roles from Ansible Galaxy.
+- Configure an offline registry, if needed.
+- Template the `imageset-config.yaml` file.
+- Start the mirroring process for offline registry and prepare the internal release.
+
 
 Requirements
 ------------
 
-You might already have this collection installed if you are using the ansible package. It is not included in ansible-core. To check whether `podman_container` it is installed, run ansible-galaxy collection list.
+This Ansible role requires the following:
 
-To install it, use: 
+- Ansible should be installed on the system where this role is executed.
+- This role is intended to work on RedHat and Fedora distributions.
 
-```bash
-ansible-galaxy collection install containers.podman
-ansible-galaxy collection install community.crypto
-ansible-galaxy collection install community.general
-```
 
 
 Role Variables
 --------------
 
-A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
+The following role variables are available for customization:
+
+- `registry_data_dir`: The directory for registry data.
+- `registry_auth_dir`: The directory for registry authentication.
+- `registry_certs_dir`: The directory for registry SSL/TLS certificates.
+- `imageset_directory`: The directory for storing imageset files.
+- `system_user_username`: The desired owner for various directories.
+- `system_user_group`: The desired group for various directories.
+- `cert_c`, `cert_s`, `cert_l`, `cert_o`, `cert_ou`, `cert_cn`: Certificate details for self-signed certificates.
+- `host_fqdn`: Fully qualified domain name for the host.
+- `registry_username`: Username for the registry authentication.
+- `registry_password`: Password for the registry authentication.
+- `registry_fqdn`: Fully qualified domain name for the registry.
+- `registry_port`: Port for the registry.
+
 
 Dependencies
 ------------
 
-A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
+This Ansible role has dependencies on the following:
+
+- containers.podman
+- community.crypto
+- community.general
+- podman
+- httpd-tools
+- python3.11
+- python3-pip
+- libselinux-python3
+- openshift
+- pyyaml
+- kubernetes
+- passlib
+- pyOpenSSL
+
+For these dependencies the playboook will make sure that are installed in your Ansible environment.
+
 
 Example Playbook
 ----------------
 
-Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
+Here's an example of how to use this Ansible role in a playbook:
 
-    - hosts: servers
-      roles:
-         - { role: username.rolename, x: 42 }
+```yaml
+Copy code
+- name: Disable chronyd on master nodes
+  hosts: localhost
+  gather_facts: false
+  environment:
+    KUBECONFIG: <path_to_kubeconfig>
+  collections:
+    - community.kubernetes
+    - kubernetes.core
+  roles:
+    - role: ocp-mirror
+```
+
 
 License
 -------
