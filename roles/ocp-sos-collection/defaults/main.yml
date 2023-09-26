@@ -1,0 +1,14 @@
+---
+# defaults file for roles/ocp-sos-collection
+
+# Arguments to the sosreport command
+sosreport_args:
+  - --ssh-user=core
+  - --cluster-type=none
+  - --alloptions
+  - --all-logs
+  - --verify
+  - --nopasswd-sudo
+  - --no-local
+  - --batch
+  - --timeout=1800
