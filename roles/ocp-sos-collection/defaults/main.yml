@@ -11,4 +11,8 @@ sosreport_args:
   - --nopasswd-sudo
   - --no-local
   - --batch
+  - --plugin-option=crio.all=on 
+  - --plugin-option=crio.logs=on 
+  - --plugin-option=podman.all=on 
+  - --plugin-option=podman.logs=on
   - --timeout=1800
