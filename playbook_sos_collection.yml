@@ -1,5 +1,5 @@
 ---
-- name: Upgrade OpenShift Cluster Playbook
+- name: SOS log collection of OpenShift Cluster Nodes Playbook
   hosts: localhost
   gather_facts: true
   roles:

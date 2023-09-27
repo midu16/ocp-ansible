@@ -1,4 +1,4 @@
-Ansible Role: Display Host OS Distribution
+Ansible Role: ocp-mirror
 =========
 
 This Ansible role is designed to perform the following tasks:
