@@ -22,7 +22,7 @@
       ##  --nodes={{servers}}
         --case-id={{ sosreport_case }}
       {% endif %}
-  when: "'RedHat' in ansible_facts['distribution'] or 'Fedora' in ansible_facts['distribution']"
+#  when: "'RedHat' in ansible_facts['distribution'] or 'Fedora' in ansible_facts['distribution']"
   register: sosreport
 
 #- name: Set fact to the file

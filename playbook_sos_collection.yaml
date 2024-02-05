@@ -1,7 +1,7 @@
 ---
 - name: SOS log collection of OpenShift Cluster Nodes Playbook
   hosts: localhost
-  gather_facts: true
-  become: yes # To perform package installation
+  gather_facts: false 
+  become: no # To perform package installation
   roles:
     - role: ocp-sos-collection
