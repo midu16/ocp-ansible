@@ -6,7 +6,8 @@ sosreport_args:
   #- --ssh-user=core
   #- --ssh-key="{{ core_ssh_key }}"
   - --cluster-type=ocp
-  - --cluster-option ocp.kubeconfig=/root/.kube/config
+  - --cluster-option ocp.token="{{ managed_serviceaccount.token }}",ocp.api-url="{{ cluster_proxy.cluster_url }}"
+  #- --cluster-option ocp.kubeconfig=/root/.kube/config
   - --alloptions
   - --all-logs
   - --verify

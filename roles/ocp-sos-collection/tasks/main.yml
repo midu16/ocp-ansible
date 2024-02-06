@@ -12,6 +12,33 @@
 #  become: true
 #  when: "'RedHat' in ansible_facts['distribution'] or 'Fedora' in ansible_facts['distribution']"
 
+- name: Display all variables/facts known for a host
+  ansible.builtin.debug:
+    var: hostvars
+
+- name: "Get ClusterProxy URL"
+  stolostron.core.cluster_proxy:
+    hub_kubeconfig: "{{ lookup('env', 'K8S_AUTH_KUBECONFIG') }}"
+#    managed_cluster: "{{ hostvars[inventory_hostname].groups[cluster_name] }}"
+    managed_cluster: "sno-worker-01"
+    wait: yes
+    timeout: 60
+  register: cluster_proxy
+
+- name: "Get managed ServiceAccount token for static ServiceAccount"
+  stolostron.core.managed_serviceaccount:
+    state: present
+    name: "{{ serviceaccount_name }}"
+    hub_kubeconfig: "{{ lookup('env', 'K8S_AUTH_KUBECONFIG') }}"
+    managed_cluster: "sno-worker-01"
+#    managed_cluster: "{{ hostvars[inventory_hostname].cluster_name }}"
+    wait: yes
+    timeout: 60
+  register: managed_serviceaccount
+
+- name: "execute oc login"
+  ansible.builtin.shell: "oc login --token={{ managed_serviceaccount.token }} {{ cluster_proxy.cluster_url }} --insecure-skip-tls-verify"
+
 - name: Create sosreport
   command: >
     sos-collector
